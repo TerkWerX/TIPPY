@@ -21,20 +21,29 @@
                     <ColumnDefinition Width="*"/>
                     <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
-                <StackPanel Grid.Column="0">
-                    <StackPanel Orientation="Horizontal">
-                        <Image x:Name="HeaderMascot" Source="/Tippy;component/Assets/Branding/tippy-toes-t.png"
-                               Width="58" Height="76" Margin="0,-14,10,-14"
-                               Stretch="Uniform" SnapsToDevicePixels="True"
-                               IsHitTestVisible="False"
-                               AutomationProperties.Name="Tippy Toes mascot"/>
-                        <Image x:Name="HeaderWordmark" Source="/Tippy;component/Assets/Branding/tippy-tattoo-wordmark.png"
-                               Width="96" Height="66" Stretch="Uniform" VerticalAlignment="Center"
-                               SnapsToDevicePixels="True" IsHitTestVisible="False"
-                               AutomationProperties.Name="TIPPY tattoo wordmark"/>
-                    </StackPanel>
-                    <TextBlock x:Name="HeaderTagline" Text="Foot control → fast macros" Style="{StaticResource SmallMutedText}" Margin="68,-5,0,0"/>
-                </StackPanel>
+                <Border x:Name="BrandBadge" Grid.Column="0" Background="#E6E8EB" BorderBrush="#C8CDD3"
+                        BorderThickness="1" CornerRadius="7" Padding="8,3,10,4">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                        </Grid.RowDefinitions>
+                        <StackPanel x:Name="BrandTopRow" Orientation="Horizontal" HorizontalAlignment="Center">
+                            <Image x:Name="HeaderMascot" Source="/Tippy;component/Assets/Branding/tippy-toes-t.png"
+                                   Width="66" Height="86" Margin="0,-1,-4,-1"
+                                   Stretch="Uniform" SnapsToDevicePixels="True"
+                                   IsHitTestVisible="False"
+                                   AutomationProperties.Name="Tippy Toes mascot"/>
+                            <Image x:Name="HeaderWordmark" Source="/Tippy;component/Assets/Branding/tippy-tattoo-wordmark.png"
+                                   Width="112" Height="76" Margin="0,0,0,-1" Stretch="Uniform" VerticalAlignment="Center"
+                                   SnapsToDevicePixels="True" IsHitTestVisible="False"
+                                   AutomationProperties.Name="TIPPY tattoo wordmark"/>
+                        </StackPanel>
+                        <TextBlock x:Name="HeaderTagline" Grid.Row="1" Text="Foot control → fast macros"
+                                   Foreground="#46586A" FontSize="12" Margin="0,-5,0,0"
+                                   HorizontalAlignment="Center" TextAlignment="Center"/>
+                    </Grid>
+                </Border>
                 <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
                     <Button Content="Open profile" Click="OpenProfile_Click" Margin="0,0,8,0"/>
                     <Button Content="Save as" Click="SaveProfile_Click" Margin="0,0,8,0"/>
