@@ -6,6 +6,7 @@ Notable changes to Tippy are documented here.
 
 ### Added
 
+- A reorganized Edit Assignment workspace with separate **Windows shortcuts**, **Keyboard keys**, **Applications**, and **Custom macro** tabs; purpose-based category navigation for 61 Windows combinations, 125 individual keys, 32 applications, and 557 application commands; global search that automatically searches all categories; and grouped macro-step tools for keyboard/text/timing, mouse/gamepad, and programs/signals.
 - Sub-compact ¼ view with exact quarter-scale pedal artwork, a 210×180 pedal-only window, unlabeled live press illumination, dot-based multi-pedal selection, automatic pressed-pedal focus, and a single full-view return control.
 - A clearly labeled, profile-persistent Compact view independent of pedal layout, with pedal-only chrome, full-size artwork, multi-pedal tabs, essential bank/edit controls, and Full view/Esc/F11 escape paths.
 - Selectable per-profile Windows MIDI outputs, live note-on/note-off device testing, explicit note-off messages, strict MIDI value validation, endpoint reconnect handling, and accurate WinMM error reporting.

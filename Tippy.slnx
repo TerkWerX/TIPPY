@@ -4,6 +4,7 @@
     <Project Path="src/Tippy.Core/Tippy.Core.csproj" />
   </Folder>
   <Folder Name="/tests/">
+    <Project Path="tests/Tippy.App.Tests/Tippy.App.Tests.csproj" />
     <Project Path="tests/Tippy.Core.Tests/Tippy.Core.Tests.csproj" />
   </Folder>
 </Solution>

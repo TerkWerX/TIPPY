@@ -17,11 +17,14 @@ public partial class MacroEditorWindow : Window
     private readonly PedalBinding _working;
     private readonly bool _releaseOnly;
     private readonly string? _gestureTarget;
-    private readonly IReadOnlyList<KnownWindowsAction> _knownActions = WindowsActionCatalog.Create();
+    private readonly IReadOnlyList<KnownWindowsAction> _knownActions;
+    private readonly IReadOnlyList<KnownWindowsAction> _windowsShortcuts;
+    private readonly IReadOnlyList<KnownWindowsAction> _keyboardKeys;
     private readonly IReadOnlyList<ApplicationShortcutProfile> _applications = ApplicationShortcutCatalog.Create();
     private readonly Stopwatch _recordingClock = new();
     private readonly HashSet<Key> _recordedDown = [];
     private ICollectionView? _actionsView;
+    private ICollectionView? _keysView;
     private ICollectionView? _applicationsView;
     private ICollectionView? _applicationShortcutsView;
     private ApplicationShortcutProfile? _selectedApplication;
@@ -35,6 +38,9 @@ public partial class MacroEditorWindow : Window
 
     private MacroEditorWindow(PedalBinding source, bool releaseOnly, string? gestureTarget = null)
     {
+        _knownActions = WindowsActionCatalog.Create();
+        _windowsShortcuts = _knownActions.Where(action => !action.IsDirectKey).ToArray();
+        _keyboardKeys = _knownActions.Where(action => action.IsDirectKey).ToArray();
         _releaseOnly = releaseOnly;
         _gestureTarget = gestureTarget;
         _working = source.Clone();
@@ -47,12 +53,25 @@ public partial class MacroEditorWindow : Window
             TriggerModeBox.SelectedIndex = CurrentMacro.TriggerMode == MacroTriggerMode.WhileHeld ? 1 : 0;
             ShiftBankBox.SelectedIndex = _working.ShiftBankIndex;
             NameBox.Text = CurrentMacro.Name;
-            ActionsList.ItemsSource = _knownActions;
+            ActionsList.ItemsSource = _windowsShortcuts;
             _actionsView = CollectionViewSource.GetDefaultView(ActionsList.ItemsSource);
+            ActionCategoryList.ItemsSource = CategoryFilters(
+                _windowsShortcuts, action => action.Category, "All shortcuts");
+            ActionCategoryList.SelectedIndex = 0;
             ActionsList.SelectedIndex = 0;
             UpdateActionCount();
+            KeysList.ItemsSource = _keyboardKeys;
+            _keysView = CollectionViewSource.GetDefaultView(KeysList.ItemsSource);
+            KeyCategoryList.ItemsSource = CategoryFilters(
+                _keyboardKeys, action => action.Category, "All keys");
+            KeyCategoryList.SelectedIndex = 0;
+            KeysList.SelectedIndex = 0;
+            UpdateKeyCount();
             ApplicationsList.ItemsSource = _applications;
             _applicationsView = CollectionViewSource.GetDefaultView(ApplicationsList.ItemsSource);
+            ApplicationCategoryList.ItemsSource = CategoryFilters(
+                _applications, application => application.Category, "All applications");
+            ApplicationCategoryList.SelectedIndex = 0;
             ApplicationsList.SelectedIndex = 0;
             UpdateApplicationCount();
             RefreshSteps();
@@ -220,17 +239,29 @@ public partial class MacroEditorWindow : Window
 
     private void ActionSearchBox_TextChanged(object sender, TextChangedEventArgs e)
     {
-        if (_actionsView is null) return;
         var query = ActionSearchBox.Text.Trim();
+        SelectAllCategoryForSearch(ActionCategoryList, query);
+        RefreshActionFilter(query);
+    }
+
+    private void ActionCategoryList_SelectionChanged(object sender, SelectionChangedEventArgs e) =>
+        RefreshActionFilter(ActionSearchBox?.Text.Trim() ?? string.Empty);
+
+    private void RefreshActionFilter(string query)
+    {
+        if (_actionsView is null) return;
+        var category = SelectedCategory(ActionCategoryList);
         _actionsView.Filter = item => item is KnownWindowsAction action &&
-            (query.Length == 0 || action.SearchText.Contains(query, StringComparison.OrdinalIgnoreCase));
+            (category is null || action.Category == category) && Matches(action.SearchText, query);
         _actionsView.Refresh();
+        ActionsList.SelectedIndex = ActionsList.Items.Count > 0 ? 0 : -1;
         UpdateActionCount();
     }
 
     private void UpdateActionCount()
     {
-        if (ActionCountText is not null) ActionCountText.Text = $"{ActionsList.Items.Count} matching actions and keys";
+        if (ActionCountText is not null)
+            ActionCountText.Text = $"{ActionsList.Items.Count} shown · {_windowsShortcuts.Count} Windows shortcuts total";
     }
 
     private void ActionsList_MouseDoubleClick(object sender, MouseButtonEventArgs e) => AssignSelectedAction();
@@ -240,6 +271,48 @@ public partial class MacroEditorWindow : Window
     private void AssignSelectedAction()
     {
         if (ActionsList.SelectedItem is not KnownWindowsAction action) return;
+        AssignKnownAction(action);
+    }
+
+    private void KeySearchBox_TextChanged(object sender, TextChangedEventArgs e)
+    {
+        var query = KeySearchBox.Text.Trim();
+        SelectAllCategoryForSearch(KeyCategoryList, query);
+        RefreshKeyFilter(query);
+    }
+
+    private void KeyCategoryList_SelectionChanged(object sender, SelectionChangedEventArgs e) =>
+        RefreshKeyFilter(KeySearchBox?.Text.Trim() ?? string.Empty);
+
+    private void RefreshKeyFilter(string query)
+    {
+        if (_keysView is null) return;
+        var category = SelectedCategory(KeyCategoryList);
+        _keysView.Filter = item => item is KnownWindowsAction action &&
+            (category is null || action.Category == category) && Matches(action.SearchText, query);
+        _keysView.Refresh();
+        KeysList.SelectedIndex = KeysList.Items.Count > 0 ? 0 : -1;
+        UpdateKeyCount();
+    }
+
+    private void UpdateKeyCount()
+    {
+        if (KeyCountText is not null)
+            KeyCountText.Text = $"{KeysList.Items.Count} shown · {_keyboardKeys.Count} individual keys total";
+    }
+
+    private void KeysList_MouseDoubleClick(object sender, MouseButtonEventArgs e) => AssignSelectedKey();
+
+    private void AssignKey_Click(object sender, RoutedEventArgs e) => AssignSelectedKey();
+
+    private void AssignSelectedKey()
+    {
+        if (KeysList.SelectedItem is not KnownWindowsAction key) return;
+        AssignKnownAction(key);
+    }
+
+    private void AssignKnownAction(KnownWindowsAction action)
+    {
         _working.Type = PedalBindingType.Macro;
         CurrentMacro.Name = action.Name;
         CurrentMacro.TriggerMode = _releaseOnly ? MacroTriggerMode.ReleaseOnce : MacroTriggerMode.PressOnce;
@@ -249,24 +322,36 @@ public partial class MacroEditorWindow : Window
         TriggerModeBox.SelectedIndex = (int)MacroTriggerMode.PressOnce;
         NameBox.Text = action.Name;
         RefreshSteps(0);
-        MacroArea.SelectedIndex = 2;
+        MacroArea.SelectedIndex = 3;
         CaptureHint.Text = $"Assigned {action.Name} ({action.Shortcut}).";
     }
 
     private void ApplicationSearchBox_TextChanged(object sender, TextChangedEventArgs e)
     {
-        if (_applicationsView is null) return;
         var query = ApplicationSearchBox.Text.Trim();
+        SelectAllCategoryForSearch(ApplicationCategoryList, query);
+        RefreshApplicationFilter(query);
+    }
+
+    private void ApplicationCategoryList_SelectionChanged(object sender, SelectionChangedEventArgs e) =>
+        RefreshApplicationFilter(ApplicationSearchBox?.Text.Trim() ?? string.Empty);
+
+    private void RefreshApplicationFilter(string query)
+    {
+        if (_applicationsView is null) return;
+        var category = SelectedCategory(ApplicationCategoryList);
         _applicationsView.Filter = item => item is ApplicationShortcutProfile application &&
-            (query.Length == 0 || application.SearchText.Contains(query, StringComparison.OrdinalIgnoreCase));
+            (category is null || application.Category == category) && Matches(application.SearchText, query);
         _applicationsView.Refresh();
+        ApplicationsList.SelectedIndex = ApplicationsList.Items.Count > 0 ? 0 : -1;
         UpdateApplicationCount();
     }
 
     private void UpdateApplicationCount()
     {
         if (ApplicationCountText is not null)
-            ApplicationCountText.Text = $"{ApplicationsList.Items.Count} applications · {_applications.Sum(application => application.Shortcuts.Count)} cataloged shortcuts";
+            ApplicationCountText.Text = $"{ApplicationsList.Items.Count} applications shown · " +
+                $"{ApplicationsList.Items.OfType<ApplicationShortcutProfile>().Sum(application => application.Shortcuts.Count)} shortcuts in view";
     }
 
     private void ApplicationsList_MouseDoubleClick(object sender, MouseButtonEventArgs e) => ViewSelectedApplication();
@@ -282,6 +367,9 @@ public partial class MacroEditorWindow : Window
         ApplicationShortcutSearchBox.Clear();
         ApplicationShortcutsList.ItemsSource = application.Shortcuts;
         _applicationShortcutsView = CollectionViewSource.GetDefaultView(ApplicationShortcutsList.ItemsSource);
+        ApplicationShortcutCategoryList.ItemsSource = CategoryFilters(
+            application.Shortcuts, shortcut => shortcut.Category, "All commands");
+        ApplicationShortcutCategoryList.SelectedIndex = 0;
         ApplicationShortcutsList.SelectedIndex = 0;
         ApplicationsPanel.Visibility = Visibility.Collapsed;
         ApplicationShortcutsPanel.Visibility = Visibility.Visible;
@@ -298,11 +386,22 @@ public partial class MacroEditorWindow : Window
 
     private void ApplicationShortcutSearchBox_TextChanged(object sender, TextChangedEventArgs e)
     {
-        if (_applicationShortcutsView is null) return;
         var query = ApplicationShortcutSearchBox.Text.Trim();
+        SelectAllCategoryForSearch(ApplicationShortcutCategoryList, query);
+        RefreshApplicationShortcutFilter(query);
+    }
+
+    private void ApplicationShortcutCategoryList_SelectionChanged(object sender, SelectionChangedEventArgs e) =>
+        RefreshApplicationShortcutFilter(ApplicationShortcutSearchBox?.Text.Trim() ?? string.Empty);
+
+    private void RefreshApplicationShortcutFilter(string query)
+    {
+        if (_applicationShortcutsView is null) return;
+        var category = SelectedCategory(ApplicationShortcutCategoryList);
         _applicationShortcutsView.Filter = item => item is ApplicationShortcut shortcut &&
-            (query.Length == 0 || shortcut.SearchText.Contains(query, StringComparison.OrdinalIgnoreCase));
+            (category is null || shortcut.Category == category) && Matches(shortcut.SearchText, query);
         _applicationShortcutsView.Refresh();
+        ApplicationShortcutsList.SelectedIndex = ApplicationShortcutsList.Items.Count > 0 ? 0 : -1;
         UpdateApplicationShortcutCount();
     }
 
@@ -334,7 +433,7 @@ public partial class MacroEditorWindow : Window
         TriggerModeBox.SelectedIndex = (int)MacroTriggerMode.PressOnce;
         NameBox.Text = CurrentMacro.Name;
         RefreshSteps(0);
-        MacroArea.SelectedIndex = 2;
+        MacroArea.SelectedIndex = 3;
         CaptureHint.Text = $"Assigned {_selectedApplication.Name} · {shortcut.Name} ({shortcut.Shortcut}).";
     }
 
@@ -640,6 +739,27 @@ public partial class MacroEditorWindow : Window
         Result = _working.Clone();
         DialogResult = true;
     }
+
+    private static IReadOnlyList<CatalogCategoryFilter> CategoryFilters<T>(
+        IReadOnlyCollection<T> items, Func<T, string> categorySelector, string allLabel)
+    {
+        var filters = new List<CatalogCategoryFilter> { new(allLabel, items.Count) };
+        filters.AddRange(items
+            .GroupBy(categorySelector)
+            .Select(group => new CatalogCategoryFilter(group.Key, group.Count())));
+        return filters;
+    }
+
+    private static string? SelectedCategory(ListBox list) =>
+        list.SelectedIndex <= 0 ? null : (list.SelectedItem as CatalogCategoryFilter)?.Name;
+
+    private static void SelectAllCategoryForSearch(ListBox list, string query)
+    {
+        if (query.Length > 0 && list.SelectedIndex > 0) list.SelectedIndex = 0;
+    }
+
+    private static bool Matches(string searchText, string query) =>
+        query.Length == 0 || searchText.Contains(query, StringComparison.OrdinalIgnoreCase);
 
     private PedalBindingType SelectedBindingType() =>
         Enum.TryParse<PedalBindingType>((BindingTypeBox.SelectedItem as ComboBoxItem)?.Tag?.ToString(), out var type)

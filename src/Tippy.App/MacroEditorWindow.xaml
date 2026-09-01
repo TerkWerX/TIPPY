@@ -1,7 +1,7 @@
 <Window x:Class="Tippy.App.MacroEditorWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Width="900" Height="850" MinWidth="740" MinHeight="680"
+        Width="900" Height="850" MinWidth="740" MinHeight="780"
         WindowStartupLocation="CenterOwner" ShowInTaskbar="False"
         Background="{DynamicResource BackgroundBrush}" Foreground="{DynamicResource TextBrush}">
     <Grid Margin="22">
@@ -10,7 +10,7 @@
         </Grid.RowDefinitions>
         <StackPanel>
             <TextBlock x:Name="AssignmentHeading" Text="Assignment" FontSize="23" FontWeight="SemiBold"/>
-            <TextBlock x:Name="AssignmentSubtitle" Text="Pick a Windows or application shortcut, type a string, or build and record a custom macro."
+            <TextBlock x:Name="AssignmentSubtitle" Text="Choose a Windows shortcut, a single key, an application command, or build a custom macro."
                        Style="{StaticResource SmallMutedText}" Margin="0,4,0,0"/>
         </StackPanel>
         <StackPanel Grid.Row="1" Margin="0,18,0,14">
@@ -85,20 +85,111 @@
         <TabControl x:Name="MacroArea" Grid.Row="2" Background="{DynamicResource SurfaceBrush}"
                     BorderBrush="{DynamicResource BorderBrush}" Foreground="{DynamicResource TextBrush}">
             <TabItem>
-                <TabItem.Header><TextBlock Text="Windows actions &amp; keys" Foreground="#111820"/></TabItem.Header>
+                <TabItem.Header><TextBlock Text="Windows shortcuts" Foreground="#111820"/></TabItem.Header>
                 <Grid Margin="12">
                     <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
-                    <TextBox x:Name="ActionSearchBox" TextChanged="ActionSearchBox_TextChanged" Padding="10,8" ToolTip="Type an action, shortcut, or key name"/>
-                    <ListBox x:Name="ActionsList" Grid.Row="1" Margin="0,10" MouseDoubleClick="ActionsList_MouseDoubleClick" ScrollViewer.HorizontalScrollBarVisibility="Disabled">
-                        <ListBox.ItemTemplate><DataTemplate>
-                            <Grid Margin="7,6">
-                                <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-                                <StackPanel><TextBlock Text="{Binding Name}" FontWeight="SemiBold" FontSize="14"/><TextBlock Text="{Binding Description}" Style="{StaticResource SmallMutedText}" Margin="0,2,10,0" TextWrapping="Wrap"/></StackPanel>
-                                <Border Grid.Column="1" Background="{DynamicResource SurfaceAltBrush}" CornerRadius="6" Padding="9,5" VerticalAlignment="Center"><TextBlock Text="{Binding Shortcut}" FontFamily="Consolas" FontWeight="SemiBold"/></Border>
-                            </Grid>
-                        </DataTemplate></ListBox.ItemTemplate>
-                    </ListBox>
-                    <Grid Grid.Row="2"><TextBlock x:Name="ActionCountText" Style="{StaticResource SmallMutedText}" VerticalAlignment="Center"/><Button Content="Assign selected action" Click="AssignAction_Click" HorizontalAlignment="Right" Background="{DynamicResource AccentBrush}" Foreground="#101820"/></Grid>
+                    <Grid>
+                        <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                        <TextBlock Text="SEARCH ALL SHORTCUTS" Style="{StaticResource SmallMutedText}" FontWeight="Bold"
+                                   VerticalAlignment="Center" Margin="0,0,10,0"/>
+                        <TextBox x:Name="ActionSearchBox" Grid.Column="1" TextChanged="ActionSearchBox_TextChanged" Padding="10,8"
+                                 ToolTip="Search every Windows shortcut by action, key combination, or description"/>
+                    </Grid>
+                    <Grid Grid.Row="1" Margin="0,10">
+                        <Grid.ColumnDefinitions><ColumnDefinition Width="185"/><ColumnDefinition Width="10"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                        <Border Background="{DynamicResource SurfaceAltBrush}" BorderBrush="{DynamicResource BorderBrush}"
+                                BorderThickness="1" CornerRadius="7" Padding="6">
+                            <DockPanel>
+                                <TextBlock DockPanel.Dock="Top" Text="BROWSE BY PURPOSE" Style="{StaticResource SmallMutedText}"
+                                           FontWeight="Bold" Margin="7,5,7,6"/>
+                                <ListBox x:Name="ActionCategoryList" SelectionChanged="ActionCategoryList_SelectionChanged"
+                                         BorderThickness="0" Background="Transparent" ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                                    <ListBox.ItemContainerStyle><Style TargetType="ListBoxItem"><Setter Property="AutomationProperties.Name" Value="{Binding Name}"/></Style></ListBox.ItemContainerStyle>
+                                    <ListBox.ItemTemplate><DataTemplate>
+                                        <StackPanel Margin="5,4">
+                                            <TextBlock Text="{Binding Name}" FontWeight="SemiBold" TextWrapping="Wrap"/>
+                                            <TextBlock Text="{Binding CountLabel}" Style="{StaticResource SmallMutedText}" FontSize="10" Margin="0,1,0,0"/>
+                                        </StackPanel>
+                                    </DataTemplate></ListBox.ItemTemplate>
+                                </ListBox>
+                            </DockPanel>
+                        </Border>
+                        <ListBox x:Name="ActionsList" Grid.Column="2" MouseDoubleClick="ActionsList_MouseDoubleClick"
+                                 ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                            <ListBox.ItemContainerStyle><Style TargetType="ListBoxItem"><Setter Property="AutomationProperties.Name" Value="{Binding Name}"/></Style></ListBox.ItemContainerStyle>
+                            <ListBox.ItemTemplate><DataTemplate>
+                                <Grid Margin="7,6">
+                                    <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                    <StackPanel>
+                                        <TextBlock Text="{Binding Name}" FontWeight="SemiBold" FontSize="14"/>
+                                        <TextBlock Text="{Binding Description}" Style="{StaticResource SmallMutedText}" Margin="0,2,10,0" TextWrapping="Wrap"/>
+                                    </StackPanel>
+                                    <Border Grid.Column="1" Background="{DynamicResource SurfaceAltBrush}" CornerRadius="6" Padding="9,5" VerticalAlignment="Center">
+                                        <TextBlock Text="{Binding Shortcut}" FontFamily="Consolas" FontWeight="SemiBold"/>
+                                    </Border>
+                                </Grid>
+                            </DataTemplate></ListBox.ItemTemplate>
+                        </ListBox>
+                    </Grid>
+                    <Grid Grid.Row="2">
+                        <TextBlock x:Name="ActionCountText" Style="{StaticResource SmallMutedText}" VerticalAlignment="Center"/>
+                        <Button Content="Assign selected shortcut" Click="AssignAction_Click" HorizontalAlignment="Right"
+                                Background="{DynamicResource AccentBrush}" Foreground="#101820"/>
+                    </Grid>
+                </Grid>
+            </TabItem>
+            <TabItem>
+                <TabItem.Header><TextBlock Text="Keyboard keys" Foreground="#111820"/></TabItem.Header>
+                <Grid Margin="12">
+                    <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+                    <Grid>
+                        <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                        <TextBlock Text="SEARCH ALL KEYS" Style="{StaticResource SmallMutedText}" FontWeight="Bold"
+                                   VerticalAlignment="Center" Margin="0,0,10,0"/>
+                        <TextBox x:Name="KeySearchBox" Grid.Column="1" TextChanged="KeySearchBox_TextChanged" Padding="10,8"
+                                 ToolTip="Search every individual keyboard, function, navigation, browser, media, or keypad key"/>
+                    </Grid>
+                    <Grid Grid.Row="1" Margin="0,10">
+                        <Grid.ColumnDefinitions><ColumnDefinition Width="185"/><ColumnDefinition Width="10"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                        <Border Background="{DynamicResource SurfaceAltBrush}" BorderBrush="{DynamicResource BorderBrush}"
+                                BorderThickness="1" CornerRadius="7" Padding="6">
+                            <DockPanel>
+                                <TextBlock DockPanel.Dock="Top" Text="KEY GROUP" Style="{StaticResource SmallMutedText}"
+                                           FontWeight="Bold" Margin="7,5,7,6"/>
+                                <ListBox x:Name="KeyCategoryList" SelectionChanged="KeyCategoryList_SelectionChanged"
+                                         BorderThickness="0" Background="Transparent" ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                                    <ListBox.ItemContainerStyle><Style TargetType="ListBoxItem"><Setter Property="AutomationProperties.Name" Value="{Binding Name}"/></Style></ListBox.ItemContainerStyle>
+                                    <ListBox.ItemTemplate><DataTemplate>
+                                        <StackPanel Margin="5,4">
+                                            <TextBlock Text="{Binding Name}" FontWeight="SemiBold" TextWrapping="Wrap"/>
+                                            <TextBlock Text="{Binding CountLabel}" Style="{StaticResource SmallMutedText}" FontSize="10" Margin="0,1,0,0"/>
+                                        </StackPanel>
+                                    </DataTemplate></ListBox.ItemTemplate>
+                                </ListBox>
+                            </DockPanel>
+                        </Border>
+                        <ListBox x:Name="KeysList" Grid.Column="2" MouseDoubleClick="KeysList_MouseDoubleClick"
+                                 ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                            <ListBox.ItemContainerStyle><Style TargetType="ListBoxItem"><Setter Property="AutomationProperties.Name" Value="{Binding Name}"/></Style></ListBox.ItemContainerStyle>
+                            <ListBox.ItemTemplate><DataTemplate>
+                                <Grid Margin="7,6">
+                                    <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                    <StackPanel>
+                                        <TextBlock Text="{Binding Name}" FontWeight="SemiBold" FontSize="14"/>
+                                        <TextBlock Text="{Binding Description}" Style="{StaticResource SmallMutedText}" Margin="0,2,10,0"/>
+                                    </StackPanel>
+                                    <Border Grid.Column="1" Background="{DynamicResource SurfaceAltBrush}" CornerRadius="6" Padding="9,5" VerticalAlignment="Center">
+                                        <TextBlock Text="{Binding Shortcut}" FontFamily="Consolas" FontWeight="SemiBold"/>
+                                    </Border>
+                                </Grid>
+                            </DataTemplate></ListBox.ItemTemplate>
+                        </ListBox>
+                    </Grid>
+                    <Grid Grid.Row="2">
+                        <TextBlock x:Name="KeyCountText" Style="{StaticResource SmallMutedText}" VerticalAlignment="Center"/>
+                        <Button Content="Assign selected key" Click="AssignKey_Click" HorizontalAlignment="Right"
+                                Background="{DynamicResource AccentBrush}" Foreground="#101820"/>
+                    </Grid>
                 </Grid>
             </TabItem>
             <TabItem>
@@ -106,25 +197,51 @@
                 <Grid Margin="12">
                     <Grid x:Name="ApplicationsPanel">
                         <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
-                        <TextBox x:Name="ApplicationSearchBox" TextChanged="ApplicationSearchBox_TextChanged" Padding="10,8"
-                                 ToolTip="Search by application, publisher, or category"/>
-                        <ListBox x:Name="ApplicationsList" Grid.Row="1" Margin="0,10" MouseDoubleClick="ApplicationsList_MouseDoubleClick"
-                                 ScrollViewer.HorizontalScrollBarVisibility="Disabled">
-                            <ListBox.ItemTemplate><DataTemplate>
-                                <Grid Margin="8,7">
-                                    <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-                                    <StackPanel>
-                                        <TextBlock Text="{Binding Name}" FontSize="15" FontWeight="SemiBold"/>
-                                        <TextBlock Style="{StaticResource SmallMutedText}" Margin="0,2,0,0">
-                                            <Run Text="{Binding Publisher}"/><Run Text=" · "/><Run Text="{Binding Category}"/>
-                                        </TextBlock>
-                                    </StackPanel>
-                                    <Border Grid.Column="1" Background="{DynamicResource SurfaceBrush}" CornerRadius="8" Padding="10,5" VerticalAlignment="Center">
-                                        <TextBlock><Run Text="{Binding Shortcuts.Count, Mode=OneWay}"/><Run Text=" shortcuts"/></TextBlock>
-                                    </Border>
-                                </Grid>
-                            </DataTemplate></ListBox.ItemTemplate>
-                        </ListBox>
+                        <Grid>
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                            <TextBlock Text="SEARCH ALL APPLICATIONS" Style="{StaticResource SmallMutedText}" FontWeight="Bold"
+                                       VerticalAlignment="Center" Margin="0,0,10,0"/>
+                            <TextBox x:Name="ApplicationSearchBox" Grid.Column="1" TextChanged="ApplicationSearchBox_TextChanged" Padding="10,8"
+                                     ToolTip="Search every application by name, publisher, or purpose"/>
+                        </Grid>
+                        <Grid Grid.Row="1" Margin="0,10">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="185"/><ColumnDefinition Width="10"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                            <Border Background="{DynamicResource SurfaceAltBrush}" BorderBrush="{DynamicResource BorderBrush}"
+                                    BorderThickness="1" CornerRadius="7" Padding="6">
+                                <DockPanel>
+                                    <TextBlock DockPanel.Dock="Top" Text="SOFTWARE TYPE" Style="{StaticResource SmallMutedText}"
+                                               FontWeight="Bold" Margin="7,5,7,6"/>
+                                    <ListBox x:Name="ApplicationCategoryList" SelectionChanged="ApplicationCategoryList_SelectionChanged"
+                                             BorderThickness="0" Background="Transparent" ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                                        <ListBox.ItemContainerStyle><Style TargetType="ListBoxItem"><Setter Property="AutomationProperties.Name" Value="{Binding Name}"/></Style></ListBox.ItemContainerStyle>
+                                        <ListBox.ItemTemplate><DataTemplate>
+                                            <StackPanel Margin="5,4">
+                                                <TextBlock Text="{Binding Name}" FontWeight="SemiBold" TextWrapping="Wrap"/>
+                                                <TextBlock Text="{Binding CountLabel}" Style="{StaticResource SmallMutedText}" FontSize="10" Margin="0,1,0,0"/>
+                                            </StackPanel>
+                                        </DataTemplate></ListBox.ItemTemplate>
+                                    </ListBox>
+                                </DockPanel>
+                            </Border>
+                            <ListBox x:Name="ApplicationsList" Grid.Column="2" MouseDoubleClick="ApplicationsList_MouseDoubleClick"
+                                     ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                                <ListBox.ItemContainerStyle><Style TargetType="ListBoxItem"><Setter Property="AutomationProperties.Name" Value="{Binding Name}"/></Style></ListBox.ItemContainerStyle>
+                                <ListBox.ItemTemplate><DataTemplate>
+                                    <Grid Margin="8,7">
+                                        <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                        <StackPanel>
+                                            <TextBlock Text="{Binding Name}" FontSize="15" FontWeight="SemiBold"/>
+                                            <TextBlock Style="{StaticResource SmallMutedText}" Margin="0,2,0,0">
+                                                <Run Text="{Binding Publisher}"/><Run Text=" · "/><Run Text="{Binding Category}"/>
+                                            </TextBlock>
+                                        </StackPanel>
+                                        <Border Grid.Column="1" Background="{DynamicResource SurfaceBrush}" CornerRadius="8" Padding="10,5" VerticalAlignment="Center">
+                                            <TextBlock><Run Text="{Binding Shortcuts.Count, Mode=OneWay}"/><Run Text=" shortcuts"/></TextBlock>
+                                        </Border>
+                                    </Grid>
+                                </DataTemplate></ListBox.ItemTemplate>
+                            </ListBox>
+                        </Grid>
                         <Grid Grid.Row="2">
                             <TextBlock x:Name="ApplicationCountText" Style="{StaticResource SmallMutedText}" VerticalAlignment="Center"/>
                             <Button Content="View shortcuts" Click="ViewApplication_Click" HorizontalAlignment="Right"
@@ -138,22 +255,54 @@
                             <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
                             <Button Content="← Applications" Click="BackToApplications_Click" Margin="0,0,12,0" Padding="10,6"/>
                             <StackPanel Grid.Column="1">
-                                <TextBlock x:Name="SelectedApplicationText" FontSize="18" FontWeight="SemiBold"/>
+                                <TextBlock x:Name="SelectedApplicationText" FontSize="18" FontWeight="SemiBold"
+                                           Foreground="{DynamicResource TextBrush}"/>
                                 <TextBlock x:Name="SelectedApplicationNoteText" Style="{StaticResource SmallMutedText}" Margin="0,2,0,0"/>
                             </StackPanel>
                         </Grid>
-                        <TextBox x:Name="ApplicationShortcutSearchBox" Grid.Row="1" TextChanged="ApplicationShortcutSearchBox_TextChanged"
-                                 Margin="0,10,0,0" Padding="10,8" ToolTip="Search commands or shortcuts in this application"/>
-                        <ListBox x:Name="ApplicationShortcutsList" Grid.Row="2" Margin="0,10" MouseDoubleClick="ApplicationShortcutsList_MouseDoubleClick"
-                                 ScrollViewer.HorizontalScrollBarVisibility="Disabled">
-                            <ListBox.ItemTemplate><DataTemplate>
-                                <Grid Margin="7,6">
-                                    <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-                                    <StackPanel><TextBlock Text="{Binding Name}" FontWeight="SemiBold" FontSize="14"/><TextBlock Text="{Binding Description}" Style="{StaticResource SmallMutedText}" Margin="0,2,10,0" TextWrapping="Wrap"/></StackPanel>
-                                    <Border Grid.Column="1" Background="{DynamicResource SurfaceBrush}" CornerRadius="6" Padding="9,5" VerticalAlignment="Center"><TextBlock Text="{Binding Shortcut}" FontFamily="Consolas" FontWeight="SemiBold"/></Border>
-                                </Grid>
-                            </DataTemplate></ListBox.ItemTemplate>
-                        </ListBox>
+                        <Grid Grid.Row="1" Margin="0,10,0,0">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                            <TextBlock Text="SEARCH ALL COMMANDS" Style="{StaticResource SmallMutedText}" FontWeight="Bold"
+                                       VerticalAlignment="Center" Margin="0,0,10,0"/>
+                            <TextBox x:Name="ApplicationShortcutSearchBox" Grid.Column="1" TextChanged="ApplicationShortcutSearchBox_TextChanged"
+                                     Padding="10,8" ToolTip="Search commands or shortcuts in this application"/>
+                        </Grid>
+                        <Grid Grid.Row="2" Margin="0,10">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="185"/><ColumnDefinition Width="10"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                            <Border Background="{DynamicResource SurfaceAltBrush}" BorderBrush="{DynamicResource BorderBrush}"
+                                    BorderThickness="1" CornerRadius="7" Padding="6">
+                                <DockPanel>
+                                    <TextBlock DockPanel.Dock="Top" Text="COMMAND TYPE" Style="{StaticResource SmallMutedText}"
+                                               FontWeight="Bold" Margin="7,5,7,6"/>
+                                    <ListBox x:Name="ApplicationShortcutCategoryList" SelectionChanged="ApplicationShortcutCategoryList_SelectionChanged"
+                                             BorderThickness="0" Background="Transparent" ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                                        <ListBox.ItemContainerStyle><Style TargetType="ListBoxItem"><Setter Property="AutomationProperties.Name" Value="{Binding Name}"/></Style></ListBox.ItemContainerStyle>
+                                        <ListBox.ItemTemplate><DataTemplate>
+                                            <StackPanel Margin="5,4">
+                                                <TextBlock Text="{Binding Name}" FontWeight="SemiBold" TextWrapping="Wrap"/>
+                                                <TextBlock Text="{Binding CountLabel}" Style="{StaticResource SmallMutedText}" FontSize="10" Margin="0,1,0,0"/>
+                                            </StackPanel>
+                                        </DataTemplate></ListBox.ItemTemplate>
+                                    </ListBox>
+                                </DockPanel>
+                            </Border>
+                            <ListBox x:Name="ApplicationShortcutsList" Grid.Column="2" MouseDoubleClick="ApplicationShortcutsList_MouseDoubleClick"
+                                     ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                                <ListBox.ItemContainerStyle><Style TargetType="ListBoxItem"><Setter Property="AutomationProperties.Name" Value="{Binding Name}"/></Style></ListBox.ItemContainerStyle>
+                                <ListBox.ItemTemplate><DataTemplate>
+                                    <Grid Margin="7,6">
+                                        <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                        <StackPanel>
+                                            <TextBlock Text="{Binding Name}" FontWeight="SemiBold" FontSize="14"/>
+                                            <TextBlock Text="{Binding Description}" Style="{StaticResource SmallMutedText}" Margin="0,2,10,0" TextWrapping="Wrap"/>
+                                        </StackPanel>
+                                        <Border Grid.Column="1" Background="{DynamicResource SurfaceBrush}" CornerRadius="6" Padding="9,5" VerticalAlignment="Center">
+                                            <TextBlock Text="{Binding Shortcut}" FontFamily="Consolas" FontWeight="SemiBold"/>
+                                        </Border>
+                                    </Grid>
+                                </DataTemplate></ListBox.ItemTemplate>
+                            </ListBox>
+                        </Grid>
                         <Grid Grid.Row="3">
                             <StackPanel VerticalAlignment="Center">
                                 <TextBlock x:Name="ApplicationShortcutCountText" Style="{StaticResource SmallMutedText}"/>
@@ -169,15 +318,56 @@
                 </Grid>
             </TabItem>
             <TabItem>
-                <TabItem.Header><TextBlock Text="Macro &amp; text" Foreground="#111820"/></TabItem.Header>
+                <TabItem.Header><TextBlock Text="Custom macro" Foreground="#111820"/></TabItem.Header>
                 <Grid Margin="12">
-                    <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+                    <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
                     <StackPanel><TextBlock Text="MACRO NAME" Style="{StaticResource SmallMutedText}" FontWeight="Bold" Margin="0,0,0,5"/><TextBox x:Name="NameBox"/></StackPanel>
-                    <Grid Grid.Row="1" Margin="0,12"><Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="8"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><TextBox x:Name="TextStringBox" Padding="8" ToolTip="Text Tippy will type exactly as entered"/><Button Grid.Column="2" Content="Add typed string" Click="AddString_Click"/></Grid>
-                    <TextBlock Grid.Row="2" Text="MACRO STEPS" Style="{StaticResource SmallMutedText}" FontWeight="Bold" Margin="0,0,0,7"/>
-                    <ListBox x:Name="StepsList" Grid.Row="3" SelectionMode="Single" Padding="5"/>
-                    <WrapPanel Grid.Row="4" Margin="0,10,0,0"><Button x:Name="RecordButton" Content="Start timed recording" Click="Record_Click" Margin="0,0,7,7" Background="{DynamicResource AccentSoftBrush}"/><Button x:Name="CaptureButton" Content="Capture shortcut" Click="CaptureShortcut_Click" Margin="0,0,7,7"/><Button Content="Type text" Click="AddText_Click" Margin="0,0,7,7"/><Button Content="Wait" Click="AddDelay_Click" Margin="0,0,7,7"/><Button Content="Mouse / scroll" Click="AddMouse_Click" Margin="0,0,7,7"/><Button Content="Gamepad" Click="AddGamepad_Click" Margin="0,0,7,7"/><Button Content="Program" Click="AddProgram_Click" Margin="0,0,7,7"/><Button Content="MIDI" Click="AddMidi_Click" Margin="0,0,7,7"/><Button Content="OSC" Click="AddOsc_Click" Margin="0,0,7,7"/></WrapPanel>
-                    <Grid Grid.Row="5" Margin="0,3,0,0"><TextBlock x:Name="CaptureHint" Text="Steps run from top to bottom." Style="{StaticResource SmallMutedText}" VerticalAlignment="Center"/><StackPanel Orientation="Horizontal" HorizontalAlignment="Right"><Button Content="↑" Click="MoveUp_Click" Padding="10,5" Margin="0,0,5,0"/><Button Content="↓" Click="MoveDown_Click" Padding="10,5" Margin="0,0,5,0"/><Button Content="Remove" Click="RemoveStep_Click" Padding="10,5"/></StackPanel></Grid>
+                    <TextBlock Grid.Row="1" Text="MACRO STEPS" Style="{StaticResource SmallMutedText}" FontWeight="Bold" Margin="0,10,0,7"/>
+                    <ListBox x:Name="StepsList" Grid.Row="2" SelectionMode="Single" Padding="5"/>
+                    <TextBlock Grid.Row="3" Text="ADD A STEP" Style="{StaticResource SmallMutedText}" FontWeight="Bold" Margin="0,9,0,5"/>
+                    <TabControl Grid.Row="4" MinHeight="104" Background="{DynamicResource SurfaceAltBrush}"
+                                BorderBrush="{DynamicResource BorderBrush}">
+                        <TabItem>
+                            <TabItem.Header><TextBlock Text="Keyboard, text &amp; timing" Foreground="#111820"/></TabItem.Header>
+                            <Grid Margin="8">
+                                <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+                                <Grid>
+                                    <Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="8"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                    <TextBox x:Name="TextStringBox" Padding="8" ToolTip="Text Tippy will type exactly as entered"/>
+                                    <Button Grid.Column="2" Content="Add typed string" Click="AddString_Click"/>
+                                </Grid>
+                                <WrapPanel Grid.Row="1" Margin="0,7,0,0">
+                                    <Button x:Name="RecordButton" Content="Record with timing" Click="Record_Click" Margin="0,0,7,0" Background="{DynamicResource AccentSoftBrush}"/>
+                                    <Button x:Name="CaptureButton" Content="Capture key combination" Click="CaptureShortcut_Click" Margin="0,0,7,0"/>
+                                    <Button Content="Prompt for text" Click="AddText_Click" Margin="0,0,7,0"/>
+                                    <Button Content="Add wait" Click="AddDelay_Click"/>
+                                </WrapPanel>
+                            </Grid>
+                        </TabItem>
+                        <TabItem>
+                            <TabItem.Header><TextBlock Text="Mouse &amp; gamepad" Foreground="#111820"/></TabItem.Header>
+                            <WrapPanel Margin="10">
+                                <Button Content="Mouse button, movement, or scroll" Click="AddMouse_Click" Margin="0,0,8,0"/>
+                                <Button Content="Virtual gamepad button" Click="AddGamepad_Click"/>
+                            </WrapPanel>
+                        </TabItem>
+                        <TabItem>
+                            <TabItem.Header><TextBlock Text="Programs &amp; signals" Foreground="#111820"/></TabItem.Header>
+                            <WrapPanel Margin="10">
+                                <Button Content="Launch program" Click="AddProgram_Click" Margin="0,0,8,0"/>
+                                <Button Content="Send MIDI" Click="AddMidi_Click" Margin="0,0,8,0"/>
+                                <Button Content="Send OSC" Click="AddOsc_Click"/>
+                            </WrapPanel>
+                        </TabItem>
+                    </TabControl>
+                    <Grid Grid.Row="5" Margin="0,5,0,0">
+                        <TextBlock x:Name="CaptureHint" Text="Steps run from top to bottom." Style="{StaticResource SmallMutedText}" VerticalAlignment="Center"/>
+                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                            <Button Content="↑" Click="MoveUp_Click" Padding="10,5" Margin="0,0,5,0"/>
+                            <Button Content="↓" Click="MoveDown_Click" Padding="10,5" Margin="0,0,5,0"/>
+                            <Button Content="Remove" Click="RemoveStep_Click" Padding="10,5"/>
+                        </StackPanel>
+                    </Grid>
                 </Grid>
             </TabItem>
         </TabControl>

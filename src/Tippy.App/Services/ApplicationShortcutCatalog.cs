@@ -79,7 +79,7 @@ public static class ApplicationShortcutCatalog
             ("Task information", "Shift+F2", "Open Task Information"), ("Assign resources", "Alt+F10", "Open Assign Resources"),
             ("Show subtasks", "Alt+Shift+=", "Show subtasks"), ("Hide subtasks", "Alt+Shift+-", "Hide subtasks")),
 
-        P("Microsoft Teams", "Microsoft", "Communication", "New Teams for Windows", "https://support.microsoft.com/en-us/office/keyboard-shortcuts-for-microsoft-teams-2e8e2a70-e8d8-4a19-949b-4c36dd5292d2",
+        P("Microsoft Teams", "Microsoft", "Communication & meetings", "New Teams for Windows", "https://support.microsoft.com/en-us/office/keyboard-shortcuts-for-microsoft-teams-2e8e2a70-e8d8-4a19-949b-4c36dd5292d2",
             ("Search", "Ctrl+E", "Move focus to Search"), ("New chat", "Ctrl+N", "Start a new chat"), ("Commands", "Ctrl+/", "Show available commands"),
             ("Keyboard shortcuts", "Ctrl+.", "Show keyboard shortcuts"), ("Go to chat", "Ctrl+2", "Open Chat"), ("Go to calendar", "Ctrl+4", "Open Calendar"),
             ("Mute microphone", "Ctrl+Shift+M", "Toggle microphone mute"), ("Toggle camera", "Ctrl+Shift+O", "Turn camera on or off"),
@@ -98,7 +98,7 @@ public static class ApplicationShortcutCatalog
             ("Previous page", "Ctrl+PageUp", "Go to previous page"), ("Next page", "Ctrl+PageDown", "Go to next page"),
             ("Macros", "Alt+F8", "Open the Macros dialog"), ("Visual Basic Editor", "Alt+F11", "Open Visual Basic Editor")),
 
-        P("GIMP", "GIMP Team", "Creative", "GIMP 3 default Windows shortcuts", "https://docs.gimp.org/3.0/en/gimp-concepts-shortcuts.html",
+        P("GIMP", "GIMP Team", "Design & imaging", "GIMP 3 default Windows shortcuts", "https://docs.gimp.org/3.0/en/gimp-concepts-shortcuts.html",
             ("Rectangle Select", "R", "Activate Rectangle Select"), ("Ellipse Select", "E", "Activate Ellipse Select"), ("Free Select", "F", "Activate Free Select"),
             ("Move tool", "M", "Activate Move"), ("Crop tool", "Shift+C", "Activate Crop"), ("Paintbrush", "P", "Activate Paintbrush"),
             ("Pencil", "N", "Activate Pencil"), ("Eraser", "Shift+E", "Activate Eraser"), ("Gradient", "G", "Activate Gradient"),
@@ -107,7 +107,7 @@ public static class ApplicationShortcutCatalog
             ("Select none", "Ctrl+Shift+A", "Clear the selection"), ("Invert selection", "Ctrl+I", "Invert the current selection"),
             ("Fit image in window", "Ctrl+Shift+J", "Fit the image in the window"), ("Toggle docks", "Tab", "Hide or show docks")),
 
-        P("Blender", "Blender Foundation", "3D / Creative", "Blender 4.x Industry-compatible concepts; default keymap may vary", "https://docs.blender.org/manual/en/latest/interface/keymap/introduction.html",
+        P("Blender", "Blender Foundation", "3D & animation", "Blender 4.x Industry-compatible concepts; default keymap may vary", "https://docs.blender.org/manual/en/latest/interface/keymap/introduction.html",
             ("Object/Edit mode", "Tab", "Toggle Edit Mode"), ("Move", "G", "Grab or move selection"), ("Rotate", "R", "Rotate selection"), ("Scale", "S", "Scale selection"),
             ("Add", "Shift+A", "Open the Add menu"), ("Duplicate", "Shift+D", "Duplicate selection"), ("Delete", "X", "Delete selection"),
             ("Search commands", "F3", "Open Operator Search"), ("Shading pie", "Z", "Open viewport shading pie"), ("Join objects", "Ctrl+J", "Join selected objects"),
@@ -116,7 +116,7 @@ public static class ApplicationShortcutCatalog
             ("Perspective/orthographic", "Numpad5", "Toggle perspective and orthographic view"), ("Frame selected", "Decimal", "Frame selected in viewport"),
             ("Maximize area", "Ctrl+Space", "Maximize or restore the active editor"), ("Recalculate normals", "Shift+N", "Recalculate normals outside in Edit Mode")),
 
-        P("Adobe Photoshop", "Adobe", "Creative", "Current Photoshop default Windows shortcuts", "https://helpx.adobe.com/photoshop/using/default-keyboard-shortcuts.html",
+        P("Adobe Photoshop", "Adobe", "Design & imaging", "Current Photoshop default Windows shortcuts", "https://helpx.adobe.com/photoshop/using/default-keyboard-shortcuts.html",
             ("Move tool", "V", "Select Move tool"), ("Marquee", "M", "Select Marquee tools"), ("Lasso", "L", "Select Lasso tools"), ("Object selection", "W", "Select object/quick selection tools"),
             ("Crop", "C", "Select Crop tool"), ("Eyedropper", "I", "Select Eyedropper"), ("Brush", "B", "Select Brush"), ("Clone Stamp", "S", "Select Clone Stamp"),
             ("Eraser", "E", "Select Eraser"), ("Gradient", "G", "Select Gradient/Paint Bucket"), ("Pen", "P", "Select Pen"), ("Type", "T", "Select Type tool"),
@@ -126,7 +126,7 @@ public static class ApplicationShortcutCatalog
             ("Image size", "Ctrl+Alt+I", "Open Image Size"), ("Canvas size", "Ctrl+Alt+C", "Open Canvas Size"),
             ("Keyboard shortcuts editor", "Ctrl+Shift+Alt+K", "Open Keyboard Shortcuts and Menus")),
 
-        P("Adobe Illustrator", "Adobe", "Creative", "Current Illustrator default Windows shortcuts", "https://helpx.adobe.com/illustrator/using/default-keyboard-shortcuts.html",
+        P("Adobe Illustrator", "Adobe", "Design & imaging", "Current Illustrator default Windows shortcuts", "https://helpx.adobe.com/illustrator/using/default-keyboard-shortcuts.html",
             ("Selection tool", "V", "Select the Selection tool"), ("Direct Selection", "A", "Select the Direct Selection tool"), ("Magic Wand", "Y", "Select Magic Wand"),
             ("Lasso", "Q", "Select Lasso"), ("Pen", "P", "Select Pen"), ("Type", "T", "Select Type tool"), ("Line Segment", "\\", "Select Line Segment tool"),
             ("Rectangle", "M", "Select Rectangle tool"), ("Ellipse", "L", "Select Ellipse tool"), ("Paintbrush", "B", "Select Paintbrush"),
@@ -139,7 +139,7 @@ public static class ApplicationShortcutCatalog
             ("Add fill", "Ctrl+/", "Add a new fill"), ("Add stroke", "Ctrl+Alt+/", "Add a new stroke"),
             ("Show hidden characters", "Ctrl+Alt+I", "Show or hide hidden characters")),
 
-        P("Adobe Premiere Pro", "Adobe", "Video", "Current Premiere default Windows shortcuts", "https://helpx.adobe.com/premiere-pro/using/keyboard-shortcuts.html",
+        P("Adobe Premiere Pro", "Adobe", "Video & motion", "Current Premiere default Windows shortcuts", "https://helpx.adobe.com/premiere-pro/using/keyboard-shortcuts.html",
             ("Selection tool", "V", "Select the Selection tool"), ("Track Select Forward", "A", "Select clips forward on a track"), ("Ripple Edit", "B", "Select Ripple Edit tool"),
             ("Rolling Edit", "N", "Select Rolling Edit tool"), ("Rate Stretch", "R", "Select Rate Stretch tool"), ("Razor", "C", "Select Razor tool"),
             ("Slip", "Y", "Select Slip tool"), ("Slide", "U", "Select Slide tool"), ("Pen", "P", "Select Pen tool"), ("Hand", "H", "Select Hand tool"),
@@ -148,7 +148,7 @@ public static class ApplicationShortcutCatalog
             ("Add edit", "Ctrl+K", "Add an edit at the playhead"), ("Add edit all tracks", "Ctrl+Shift+K", "Add edits on all targeted tracks"),
             ("Export Media", "Ctrl+M", "Open Export mode"), ("Keyboard shortcuts", "Ctrl+Alt+K", "Open Keyboard Shortcuts")),
 
-        P("Adobe After Effects", "Adobe", "Motion graphics", "Current After Effects default Windows shortcuts", "https://helpx.adobe.com/after-effects/using/keyboard-shortcuts-reference.html",
+        P("Adobe After Effects", "Adobe", "Video & motion", "Current After Effects default Windows shortcuts", "https://helpx.adobe.com/after-effects/using/keyboard-shortcuts-reference.html",
             ("Selection tool", "V", "Activate Selection tool"), ("Hand tool", "H", "Activate Hand tool"), ("Zoom tool", "Z", "Activate Zoom tool"),
             ("Rotation tool", "W", "Activate Rotation tool"), ("Pan Behind tool", "Y", "Activate Pan Behind"), ("Pen tool", "G", "Activate Pen tool"),
             ("Text tool", "Ctrl+T", "Activate Horizontal Type tool"), ("New composition", "Ctrl+N", "Create a composition"),
@@ -158,7 +158,7 @@ public static class ApplicationShortcutCatalog
             ("Reveal rotation", "R", "Show Rotation property"), ("Reveal opacity", "T", "Show Opacity property"), ("Reveal audio", "L", "Show Audio Levels"),
             ("Easy Ease", "F9", "Apply Easy Ease to selected keyframes"), ("Add marker", "Multiply", "Add a composition marker")),
 
-        P("Autodesk Maya", "Autodesk", "3D / Creative", "Maya 2025–2026 default hotkey set", "https://help.autodesk.com/cloudhelp/2025/ENU/Maya-KeyboardShortcuts/files/GUID-30CACC9D-8FBE-4B85-8A8F-C5ADF32DDD4E.htm",
+        P("Autodesk Maya", "Autodesk", "3D & animation", "Maya 2025–2026 default hotkey set", "https://help.autodesk.com/cloudhelp/2025/ENU/Maya-KeyboardShortcuts/files/GUID-30CACC9D-8FBE-4B85-8A8F-C5ADF32DDD4E.htm",
             ("Select tool", "Q", "Activate Select tool"), ("Move tool", "W", "Activate Move tool"), ("Rotate tool", "E", "Activate Rotate tool"), ("Scale tool", "R", "Activate Scale tool"),
             ("Last used tool", "Y", "Select the last non-transform tool"), ("Repeat last action", "G", "Repeat the last action"),
             ("Object/component mode", "F8", "Toggle object and component selection"), ("Set key", "S", "Set a keyframe"),
@@ -169,7 +169,7 @@ public static class ApplicationShortcutCatalog
             ("Fullscreen panel", "Ctrl+Space", "Toggle current panel full screen"), ("Attribute Editor/Channel Box", "Ctrl+A", "Switch Attribute Editor and Channel Box"),
             ("Undo view", "[", "Undo the last view change"), ("Redo view", "]", "Redo the last view change"), ("Cycle background", "Alt+B", "Cycle viewport background color")),
 
-        P("Autodesk 3ds Max", "Autodesk", "3D / Creative", "3ds Max 2024–2026 default hotkeys", "https://help.autodesk.com/cloudhelp/2024/ENU/3DSMax-Basics/files/GUID-AA36F53A-96A9-49A9-B66E-58A13AA788F9.htm",
+        P("Autodesk 3ds Max", "Autodesk", "3D & animation", "3ds Max 2024–2026 default hotkeys", "https://help.autodesk.com/cloudhelp/2024/ENU/3DSMax-Basics/files/GUID-AA36F53A-96A9-49A9-B66E-58A13AA788F9.htm",
             ("Select", "Q", "Activate Select Object"), ("Move", "W", "Activate Select and Move"), ("Rotate", "E", "Activate Select and Rotate"), ("Scale", "R", "Activate Select and Scale"),
             ("Material Editor", "M", "Open Material Editor"), ("Render setup", "F10", "Open Render Setup"), ("Render frame", "F9", "Render the current frame"),
             ("Wireframe", "F3", "Toggle wireframe and shaded view"), ("Edged faces", "F4", "Toggle edged faces"), ("Safe frames", "Shift+F", "Toggle safe frames"),
@@ -178,7 +178,7 @@ public static class ApplicationShortcutCatalog
             ("Perspective view", "P", "Switch active viewport to Perspective"), ("Camera view", "C", "Switch active viewport to Camera"),
             ("Zoom extents all", "Shift+Ctrl+Z", "Zoom extents in all viewports"), ("Angle snap", "A", "Toggle angle snap"), ("Percent snap", "Shift+Ctrl+P", "Toggle percent snap")),
 
-        P("Ableton Live", "Ableton", "DAW / Music", "Live 12 default Windows shortcuts", "https://www.ableton.com/en/manual/live-keyboard-shortcuts/",
+        P("Ableton Live", "Ableton", "Music production", "Live 12 default Windows shortcuts", "https://www.ableton.com/en/manual/live-keyboard-shortcuts/",
             ("Play/stop", "Space", "Play from start marker or stop"), ("Continue playback", "Shift+Space", "Continue from the stop point"), ("Record", "F9", "Toggle arrangement recording"),
             ("Session/Arrangement", "Tab", "Toggle Session and Arrangement views"), ("Device/Clip view", "Shift+Tab", "Toggle Device and Clip view"),
             ("Hot-swap", "Q", "Toggle Hot-Swap Mode"), ("Browser", "Ctrl+Alt+B", "Show or hide Browser"), ("Mixer", "Ctrl+Alt+M", "Show or hide Mixer"),
@@ -189,7 +189,7 @@ public static class ApplicationShortcutCatalog
             ("MIDI Map Mode", "Ctrl+M", "Toggle MIDI mapping"), ("Key Map Mode", "Ctrl+K", "Toggle key mapping"), ("Computer MIDI keyboard", "M", "Toggle computer MIDI keyboard"),
             ("Full screen", "F11", "Toggle Full Screen Mode"), ("Second window", "Ctrl+Shift+W", "Toggle second window")),
 
-        P("Reason", "Reason Studios", "DAW / Music", "Reason 12–14 Windows key commands", "https://docs.reasonstudios.com/reason12/key-commands",
+        P("Reason", "Reason Studios", "Music production", "Reason 12–14 Windows key commands", "https://docs.reasonstudios.com/reason12/key-commands",
             ("Main Mixer", "F5", "Maximize or restore Main Mixer"), ("Rack", "F6", "Maximize or restore Rack"), ("Sequencer", "F7", "Maximize or restore Sequencer"),
             ("Detach Main Mixer", "Ctrl+F5", "Detach or attach Main Mixer"), ("Detach Rack", "Ctrl+F6", "Detach or attach Rack"),
             ("Play/stop", "Space", "Start or stop playback"), ("Stop", "Numpad0", "Stop playback"), ("Record", "Multiply", "Start recording"),
@@ -197,28 +197,28 @@ public static class ApplicationShortcutCatalog
             ("Toggle loop", "L", "Turn sequencer loop on or off"), ("Metronome", "C", "Turn click on or off"),
             ("Quantize", "Ctrl+K", "Quantize selected notes or events"), ("Duplicate", "Ctrl+D", "Duplicate selection"), ("Join clips", "Ctrl+J", "Join selected clips")),
 
-        P("Akai MPC Software", "Akai Professional", "DAW / Music", "MPC Software 2.x; shortcuts can vary with hardware mode", "https://www.akaipro.com/mpc-manuals",
+        P("Akai MPC Software", "Akai Professional", "Music production", "MPC Software 2.x; shortcuts can vary with hardware mode", "https://www.akaipro.com/mpc-manuals",
             ("Play/stop", "Space", "Toggle sequence playback"), ("Play from start", "Shift+Space", "Play the sequence from its start"),
             ("Record", "Ctrl+R", "Enter record mode"), ("Overdub", "Ctrl+D", "Enter overdub mode"), ("Tap tempo", "T", "Tap the project tempo"),
             ("Undo", "Ctrl+Z", "Undo the last edit"), ("Redo", "Ctrl+Shift+Z", "Redo the last edit"), ("Save", "Ctrl+S", "Save the project"),
             ("Save As", "Ctrl+Shift+S", "Save the project under a new name"), ("Select all", "Ctrl+A", "Select all items in the focused editor"),
             ("Duplicate", "Ctrl+D", "Duplicate selected events"), ("Delete", "Delete", "Delete selected events"), ("Quantize", "Q", "Open or apply timing correction")),
 
-        P("ACID Pro", "MAGIX", "DAW / Music", "ACID Pro 10–11 default Windows commands", "https://help.magix-hub.com/video/acid/en/",
+        P("ACID Pro", "MAGIX", "Music production", "ACID Pro 10–11 default Windows commands", "https://help.magix-hub.com/video/acid/en/",
             ("Play/stop", "Space", "Start or stop playback"), ("Play from start", "Shift+Space", "Play from the project start"), ("Record", "Ctrl+R", "Start recording"),
             ("Split event", "S", "Split selected event at cursor"), ("Create loop region", "R", "Create a region from the time selection"),
             ("Insert marker", "M", "Insert a marker at the cursor"), ("Insert tempo change", "T", "Insert a tempo/key/time-signature marker"),
             ("Quantize", "Ctrl+Q", "Quantize selected events"), ("Render As", "Ctrl+M", "Render the project"),
             ("Mix to new track", "Ctrl+Shift+M", "Mix the project to a new track"), ("Zoom to project", "F", "Fit the project timeline")),
 
-        P("REAPER", "Cockos", "DAW / Music", "REAPER default Windows key map; actions are fully customizable", "https://www.reaper.fm/userguide.php",
+        P("REAPER", "Cockos", "Music production", "REAPER default Windows key map; actions are fully customizable", "https://www.reaper.fm/userguide.php",
             ("Play/stop", "Space", "Toggle playback"), ("Pause", "Ctrl+Space", "Pause playback"), ("Record", "Ctrl+R", "Start recording"),
             ("Split items", "S", "Split selected items at cursor"), ("Item properties", "F2", "Open item properties"), ("Track Manager", "Ctrl+Shift+M", "Open Track Manager"),
             ("Insert marker", "M", "Insert marker at current position"), ("Insert region", "Shift+R", "Create a region from time selection"),
             ("Toggle repeat", "R", "Toggle repeat/loop"), ("Metronome", "Ctrl+Shift+M", "Toggle metronome in some default maps"),
             ("Render", "Ctrl+Alt+R", "Open Render to File"), ("Action List", "Shift+/", "Open the Actions list")),
 
-        P("Audacity", "Audacity Team", "Audio", "Audacity 3.x default Windows shortcuts", "https://manual.audacityteam.org/man/keyboard_shortcut_reference.html",
+        P("Audacity", "Audacity Team", "Audio editing", "Audacity 3.x default Windows shortcuts", "https://manual.audacityteam.org/man/keyboard_shortcut_reference.html",
             ("Play/stop", "Space", "Start or stop playback"), ("Pause", "P", "Pause or resume"), ("Record", "R", "Start recording"),
             ("Append record", "Shift+R", "Record at the end of the selected track"), ("Loop play", "Shift+Space", "Loop the selected audio"),
             ("Split", "Ctrl+I", "Split clip at selection"), ("Silence audio", "Ctrl+L", "Replace selected audio with silence"),
@@ -226,7 +226,7 @@ public static class ApplicationShortcutCatalog
             ("Zoom in", "Ctrl+1", "Zoom in"), ("Zoom normal", "Ctrl+2", "Zoom to normal"), ("Zoom out", "Ctrl+3", "Zoom out"),
             ("Fit selection", "Ctrl+E", "Fit selection to width"), ("Fit project", "Ctrl+F", "Fit project to width")),
 
-        P("OBS Studio", "OBS Project", "Streaming / Live Production", "Suggested paired bindings for OBS Studio 30/31. Assign the same combinations in Settings > Hotkeys before use.", "https://obsproject.com/kb/obs-studio-overview",
+        P("OBS Studio", "OBS Project", "Streaming & live production", "Suggested paired bindings for OBS Studio 30/31. Assign the same combinations in Settings > Hotkeys before use.", "https://obsproject.com/kb/obs-studio-overview",
             ("Switch to scene / camera 1", "Ctrl+Alt+Shift+1", "Suggested binding; assign this key to the desired scene in OBS Hotkeys"),
             ("Switch to scene / camera 2", "Ctrl+Alt+Shift+2", "Suggested binding; assign this key to the desired scene in OBS Hotkeys"),
             ("Switch to scene / camera 3", "Ctrl+Alt+Shift+3", "Suggested binding; assign this key to the desired scene in OBS Hotkeys"),
@@ -248,7 +248,7 @@ public static class ApplicationShortcutCatalog
             ("Show/hide camera source", "Ctrl+Alt+Shift+C", "Suggested binding; assign this key to the camera source's Show and Hide actions"),
             ("Save replay buffer", "Ctrl+Alt+Shift+L", "Suggested binding; assign this key to Save Replay in OBS Hotkeys")),
 
-        P("Streamlabs Desktop", "Streamlabs", "Streaming / Live Production", "Suggested paired bindings. Assign the same combinations in Settings > Hotkeys before use.", "https://support.streamlabs.com/hc/en-us/articles/4413170379675-How-to-Set-up-Hotkeys-in-Streamlabs-Desktop",
+        P("Streamlabs Desktop", "Streamlabs", "Streaming & live production", "Suggested paired bindings. Assign the same combinations in Settings > Hotkeys before use.", "https://support.streamlabs.com/hc/en-us/articles/4413170379675-How-to-Set-up-Hotkeys-in-Streamlabs-Desktop",
             ("Switch to scene / camera 1", "Ctrl+Alt+Shift+1", "Suggested binding; assign this key to the desired scene in Streamlabs Hotkeys"),
             ("Switch to scene / camera 2", "Ctrl+Alt+Shift+2", "Suggested binding; assign this key to the desired scene in Streamlabs Hotkeys"),
             ("Switch to scene / camera 3", "Ctrl+Alt+Shift+3", "Suggested binding; assign this key to the desired scene in Streamlabs Hotkeys"),
@@ -267,7 +267,7 @@ public static class ApplicationShortcutCatalog
             ("Save replay", "Ctrl+Alt+Shift+L", "Suggested binding; assign this key to Save Replay"),
             ("Skip alert", "Ctrl+Alt+Shift+K", "Suggested binding; assign this key to Skip Alert")),
 
-        P("vMix", "StudioCoast", "Streaming / Live Production", "Suggested paired bindings for vMix 28/29. Assign the same combinations in Settings > Shortcuts and select the corresponding function/input.", "https://www.vmix.com/help29/KeyboardShortcuts.html",
+        P("vMix", "StudioCoast", "Streaming & live production", "Suggested paired bindings for vMix 28/29. Assign the same combinations in Settings > Shortcuts and select the corresponding function/input.", "https://www.vmix.com/help29/KeyboardShortcuts.html",
             ("Cut directly to input / camera 1", "Ctrl+Alt+Shift+1", "Suggested binding; create a vMix shortcut using CutDirect and Input 1"),
             ("Cut directly to input / camera 2", "Ctrl+Alt+Shift+2", "Suggested binding; create a vMix shortcut using CutDirect and Input 2"),
             ("Cut directly to input / camera 3", "Ctrl+Alt+Shift+3", "Suggested binding; create a vMix shortcut using CutDirect and Input 3"),
@@ -286,7 +286,7 @@ public static class ApplicationShortcutCatalog
             ("Mute/unmute microphone input", "Ctrl+Alt+Shift+M", "Suggested binding; create a vMix AudioOn/AudioOff shortcut for the microphone input"),
             ("Toggle overlay 1", "Ctrl+Alt+Shift+O", "Suggested binding; create a vMix shortcut for OverlayInput1In/Out")),
 
-        P("XSplit Broadcaster", "SplitmediaLabs", "Streaming / Live Production", "Suggested paired bindings. Assign the same combinations in Tools > Settings > Hotkeys before use.", "https://support.xsplit.com/en/article/settings-9b70rh/",
+        P("XSplit Broadcaster", "SplitmediaLabs", "Streaming & live production", "Suggested paired bindings. Assign the same combinations in Tools > Settings > Hotkeys before use.", "https://support.xsplit.com/en/article/settings-9b70rh/",
             ("Switch to scene / camera 1", "Ctrl+Alt+Shift+1", "Suggested binding; assign this key to scene 1 in XSplit Hotkeys"),
             ("Switch to scene / camera 2", "Ctrl+Alt+Shift+2", "Suggested binding; assign this key to scene 2 in XSplit Hotkeys"),
             ("Switch to scene / camera 3", "Ctrl+Alt+Shift+3", "Suggested binding; assign this key to scene 3 in XSplit Hotkeys"),
@@ -304,7 +304,7 @@ public static class ApplicationShortcutCatalog
             ("Show/hide camera source", "Ctrl+Alt+Shift+C", "Suggested binding; assign this key to the camera source's visibility action"),
             ("Take screenshot", "Ctrl+Alt+Shift+P", "Suggested binding; assign this key to the screenshot action")),
 
-        P("Wirecast", "Telestream", "Streaming / Live Production", "Suggested paired bindings. Assign the same combinations in Preferences > Shortcuts or Document Hotkeys before use.", "https://www.telestream.net/pdfs/technical/Wirecast-Shortcuts-Hotkeys-Resource-Guide.pdf",
+        P("Wirecast", "Telestream", "Streaming & live production", "Suggested paired bindings. Assign the same combinations in Preferences > Shortcuts or Document Hotkeys before use.", "https://www.telestream.net/pdfs/technical/Wirecast-Shortcuts-Hotkeys-Resource-Guide.pdf",
             ("Select shot / camera 1", "Ctrl+Alt+Shift+1", "Suggested binding; assign this document hotkey to shot 1 in Wirecast"),
             ("Select shot / camera 2", "Ctrl+Alt+Shift+2", "Suggested binding; assign this document hotkey to shot 2 in Wirecast"),
             ("Select shot / camera 3", "Ctrl+Alt+Shift+3", "Suggested binding; assign this document hotkey to shot 3 in Wirecast"),
@@ -331,7 +331,7 @@ public static class ApplicationShortcutCatalog
             ("Zen Mode", "Ctrl+K", "Start the Zen Mode chord; press Z next"), ("Run task", "Ctrl+Shift+B", "Run the configured build task"),
             ("Start debugging", "F5", "Start or continue debugging"), ("Step over", "F10", "Step over in debugger"), ("Step into", "F11", "Step into in debugger")),
 
-        P("VLC media player", "VideoLAN", "Media", "VLC 3.x default Windows hotkeys", "https://docs.videolan.me/vlc-user/desktop/3.0/en/basic/hotkeys.html",
+        P("VLC media player", "VideoLAN", "Media playback", "VLC 3.x default Windows hotkeys", "https://docs.videolan.me/vlc-user/desktop/3.0/en/basic/hotkeys.html",
             ("Play/pause", "Space", "Toggle playback"), ("Stop", "S", "Stop playback"), ("Next", "N", "Next playlist item"), ("Previous", "P", "Previous playlist item"),
             ("Fullscreen", "F", "Toggle fullscreen"), ("Exit fullscreen", "Escape", "Leave fullscreen"), ("Mute", "M", "Toggle mute"),
             ("Volume up", "Ctrl+Up", "Increase volume"), ("Volume down", "Ctrl+Down", "Decrease volume"),
@@ -339,7 +339,7 @@ public static class ApplicationShortcutCatalog
             ("Faster", "Shift+=", "Increase playback speed"), ("Slower", "-", "Decrease playback speed"), ("Normal speed", "=", "Restore normal playback speed"),
             ("Audio track", "B", "Cycle audio tracks"), ("Subtitle track", "V", "Cycle subtitle tracks"), ("Playlist", "Ctrl+L", "Show or hide playlist")),
 
-        P("Notepad++", "Notepad++ Team", "Text editor", "Notepad++ 8.x defaults; Shortcut Mapper can customize these", "https://npp-user-manual.org/docs/keyboard/",
+        P("Notepad++", "Notepad++ Team", "Text editors", "Notepad++ 8.x defaults; Shortcut Mapper can customize these", "https://npp-user-manual.org/docs/keyboard/",
             ("New file", "Ctrl+N", "Create a new file"), ("Open file", "Ctrl+O", "Open a file"), ("Save all", "Ctrl+Shift+S", "Save all open files"),
             ("Close all", "Ctrl+Shift+W", "Close all open files"), ("Find in files", "Ctrl+Shift+F", "Search files"), ("Replace", "Ctrl+H", "Open Replace"),
             ("Go to line", "Ctrl+G", "Go to a line"), ("Duplicate line", "Ctrl+D", "Duplicate current line"), ("Delete line", "Ctrl+L", "Delete current line"),
@@ -352,5 +352,54 @@ public static class ApplicationShortcutCatalog
     private static ApplicationShortcutProfile P(string name, string publisher, string category,
         string versionNote, string sourceUrl, params (string Name, string Shortcut, string Description)[] shortcuts) =>
         new(name, publisher, category, versionNote, sourceUrl,
-            shortcuts.Select(item => new ApplicationShortcut("Commands", item.Name, item.Shortcut, item.Description)).ToArray());
+            shortcuts.Select(item => new ApplicationShortcut(
+                ShortcutCategory(item.Name, item.Description), item.Name, item.Shortcut, item.Description)).ToArray());
+
+    internal static string ShortcutCategory(string name, string description)
+    {
+        var text = $"{name} {description}";
+        if (ContainsAny(text, "scene", "camera", "shot", "stream", "broadcast", "virtual camera",
+                "transition", "overlay", "microphone", "desktop audio", "system sound", "source visibility",
+                "replay", "autolive", "studio mode", "alert"))
+            return "Live production";
+        if (ContainsAny(text, "message", "reply", "send", "mail", "chat", "call", "raise hand",
+                "contact", "inbox", "outbox", "calendar"))
+            return "Communication";
+        if (ContainsAny(text, "debug", "terminal", "definition", "symbol", "build task", "command palette",
+                "quick open", "format document", "comment", "visual basic", "macro dialog"))
+            return "Development";
+        if (ContainsAny(text, "play", "pause", "record", "shuttle", "transport", "audio track",
+                "subtitle track", "playback speed", "faster", "slower", "metronome", "overdub",
+                "volume", "jump forward", "jump backward"))
+            return "Playback & recording";
+        if (ContainsAny(text, "layer", "format", "bold", "italic", "underline", "style", "heading",
+                "align", "group", "ungroup", "transform", "fill", "stroke", "outline", "clipping mask",
+                "paragraph", "bring", "send backward", "send to back", "slide", "shape", "object",
+                "bulleted", "superscript", "subscript", "parent", "fade"))
+            return "Format & arrange";
+        if (ContainsAny(text, "tool", "brush", "crop", "paint", "eraser", "gradient", "clone", "pen",
+                "lasso", "marquee", "eyedropper", "pencil", "path", "rotate", "scale", "move selection",
+                "add menu", "add fill", "add stroke", "hyperlink", "footnote", "endnote", "autosum",
+                " tag", "task today", "activate text", "midi track", "return track", "key translate"))
+            return "Tools & creation";
+        if (ContainsAny(text, "undo", "redo", "copy", "cut", "paste", "delete", "duplicate", "select",
+                "find", "replace", "split", "trim", "silence", "step backward", "edit active",
+                "track changes", "repeat last", "add edit", "move line"))
+            return "Edit & selection";
+        if (ContainsAny(text, "marker", "region", "quantize", "tempo", "current date", "current time",
+                "date and time", "loop", "in point", "out point", "time remapping", "locator"))
+            return "Timing & markers";
+        if (ContainsAny(text, "new", "open", "save", "close", "export", "render", "print", "project",
+                "publication", "workbook", "document", "file", "sync", "lock protected"))
+            return "Files & projects";
+        if (ContainsAny(text, "view", "show", "hide", "toggle", "zoom", "full screen", "fullscreen",
+                "go to", "next", "previous", "page", "tab", "panel", "pane", "window", "worksheet",
+                "sidebar", "grid", "guides", "front", "side", "top", "frame", "fit", "maximize",
+                "cycle", "search", "detach", "attribute editor", "channel box", "fold", "unfold"))
+            return "View & navigation";
+        return "General & specialized";
+    }
+
+    private static bool ContainsAny(string value, params string[] terms) =>
+        terms.Any(term => value.Contains(term, StringComparison.OrdinalIgnoreCase));
 }
