@@ -5,7 +5,8 @@ using System.Text.Json.Serialization;
 public enum MacroTriggerMode
 {
     PressOnce,
-    WhileHeld
+    WhileHeld,
+    ReleaseOnce
 }
 
 public sealed class MacroDefinition

@@ -6,6 +6,11 @@ Notable changes to Tippy are documented here.
 
 ### Added
 
+- Fail-safe held-output tracking with shared-key reference counts, disconnect/lock/suspend cleanup, one-shot macro cleanup, and an emergency **Release all held inputs** tray command.
+- Dynamic, idle-armed learning and runtime support for raw-HID pedals with 1–32 digital switches, plus a generic layout for non-Infinity hardware.
+- **Run once when released** assignment behavior and automatic closing key-up events for timed recordings stopped mid-keypress.
+- Bounded HID reconnect backoff after open or reader failures.
+- Compatibility, support-tier, performance-target, and future-device roadmap documentation.
 - Configurable tile layout with automatic or 1–6-column grids for larger pedal collections.
 - Dedicated compact tabbed mode that shows one full-size pedal at a time in a smaller application window.
 - Persistent selected pedal tab and tile-column preference in profile schema version 4.

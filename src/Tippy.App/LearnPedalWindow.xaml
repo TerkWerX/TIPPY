@@ -1,7 +1,7 @@
 <Window x:Class="Tippy.App.LearnPedalWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="Learn New Pedal" Width="790" Height="700" MinWidth="690" MinHeight="620"
+        Title="Learn New Pedal" Width="840" Height="740" MinWidth="740" MinHeight="640"
         WindowStartupLocation="CenterOwner" ShowInTaskbar="False"
         Background="{DynamicResource BackgroundBrush}" Foreground="{DynamicResource TextBrush}">
     <Grid Margin="24">
@@ -38,6 +38,8 @@
                     <ColumnDefinition/>
                     <ColumnDefinition Width="18"/>
                     <ColumnDefinition/>
+                    <ColumnDefinition Width="18"/>
+                    <ColumnDefinition Width="145"/>
                 </Grid.ColumnDefinitions>
                 <StackPanel>
                     <TextBlock Text="DEVICE DETAILS" Style="{StaticResource SmallMutedText}" FontWeight="Bold"/>
@@ -47,30 +49,30 @@
                     <TextBlock Text="MAPPING NAME" Style="{StaticResource SmallMutedText}" FontWeight="Bold"/>
                     <TextBox x:Name="MappingNameBox" Margin="0,6,0,0"/>
                 </StackPanel>
+                <StackPanel Grid.Column="4">
+                    <TextBlock Text="NUMBER OF SWITCHES" Style="{StaticResource SmallMutedText}" FontWeight="Bold"/>
+                    <ComboBox x:Name="SwitchCountBox" Margin="0,6,0,0"
+                              SelectionChanged="SwitchCountBox_SelectionChanged"/>
+                </StackPanel>
             </Grid>
         </Border>
 
         <Grid Grid.Row="3">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/>
-                <RowDefinition/>
-                <RowDefinition/>
-                <RowDefinition/>
+                <RowDefinition Height="*"/>
                 <RowDefinition Height="Auto"/>
             </Grid.RowDefinitions>
             <TextBlock Text="2  CAPTURE EACH SWITCH" Style="{StaticResource SmallMutedText}" FontWeight="Bold" Margin="0,0,0,8"/>
-            <Border x:Name="LeftStep" Grid.Row="1" Background="{DynamicResource SurfaceAltBrush}" CornerRadius="8"
-                    BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" Padding="13" Margin="0,0,0,8"/>
-            <Border x:Name="CenterStep" Grid.Row="2" Background="{DynamicResource SurfaceAltBrush}" CornerRadius="8"
-                    BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" Padding="13" Margin="0,0,0,8"/>
-            <Border x:Name="RightStep" Grid.Row="3" Background="{DynamicResource SurfaceAltBrush}" CornerRadius="8"
-                    BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" Padding="13"/>
-            <TextBlock Grid.Row="4" x:Name="LearningHint" Text="Release every switch before starting a capture. Tippy stores only the small HID reports shown here."
+            <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                <StackPanel x:Name="SwitchStepsPanel"/>
+            </ScrollViewer>
+            <TextBlock Grid.Row="2" x:Name="LearningHint" Text="Release every switch before starting a capture. Tippy stores only the small HID reports shown here."
                        TextWrapping="Wrap" Style="{StaticResource SmallMutedText}" Margin="0,10,0,0"/>
         </Grid>
 
         <Grid Grid.Row="4" Margin="0,20,0,0">
-            <TextBlock x:Name="ResultHint" Text="Capture all three switches to finish." Style="{StaticResource SmallMutedText}" VerticalAlignment="Center"/>
+            <TextBlock x:Name="ResultHint" Text="Capture every switch to finish." Style="{StaticResource SmallMutedText}" VerticalAlignment="Center"/>
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
                 <Button Content="Cancel" IsCancel="True" Margin="0,0,8,0"/>
                 <Button x:Name="FinishButton" Content="Save learned pedal" Click="Finish_Click" IsEnabled="False"

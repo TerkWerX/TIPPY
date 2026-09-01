@@ -25,6 +25,22 @@ public sealed class LearnedPedalDefinition
             rule.PressedConditions ??= [];
         }
     }
+
+    public bool MatchesHardwareIdentity(LearnedPedalDefinition other)
+    {
+        if (VendorId != other.VendorId || ProductId != other.ProductId)
+        {
+            return false;
+        }
+        if (!string.IsNullOrWhiteSpace(ReportDescriptorHash) &&
+            !string.IsNullOrWhiteSpace(other.ReportDescriptorHash))
+        {
+            return ReportDescriptorHash.Equals(other.ReportDescriptorHash, StringComparison.OrdinalIgnoreCase);
+        }
+        return ReportLength == other.ReportLength &&
+               (string.IsNullOrWhiteSpace(ProductName) || string.IsNullOrWhiteSpace(other.ProductName) ||
+                ProductName.Equals(other.ProductName, StringComparison.OrdinalIgnoreCase));
+    }
 }
 
 public sealed class LearnedSwitchRule

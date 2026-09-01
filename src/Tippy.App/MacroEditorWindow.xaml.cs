@@ -153,6 +153,14 @@ public partial class MacroEditorWindow : Window
     {
         _recording = false;
         _recordingClock.Stop();
+        if (_recordedDown.Count > 0)
+        {
+            foreach (var key in _recordedDown.Reverse().ToArray())
+            {
+                AddRecordedEvent(MacroStepType.KeyUp, key);
+            }
+            message += " Held keys were closed with matching release events.";
+        }
         _recordedDown.Clear();
         RecordButton.Content = "Start timed recording";
         CaptureHint.Text = message;

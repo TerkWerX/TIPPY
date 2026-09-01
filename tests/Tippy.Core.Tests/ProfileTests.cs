@@ -15,6 +15,15 @@ public sealed class ProfileTests
     }
 
     [Fact]
+    public void DeviceBanksSupportMoreThanThreeSwitches()
+    {
+        var device = PedalDeviceProfile.Create("key", "Five switch", 1, 2, 5);
+
+        Assert.Equal(5, device.SwitchCount);
+        Assert.All(device.Banks, bank => Assert.Equal(5, bank.Bindings.Count));
+    }
+
+    [Fact]
     public void NextBankWraps()
     {
         var profile = new AppProfile { ActiveBankIndex = 2 };
@@ -80,6 +89,21 @@ public sealed class ProfileTests
     }
 
     [Fact]
+    public void ReleaseOnceTriggerRoundTrips()
+    {
+        var profile = new AppProfile();
+        var device = PedalDeviceProfile.Create("dev", "Pedal", 1, 2);
+        device.Banks[0].Bindings[0].Macro.TriggerMode = MacroTriggerMode.ReleaseOnce;
+        profile.Devices.Add(device);
+
+        var serializer = new ProfileSerializer();
+        var loaded = serializer.Deserialize(serializer.Serialize(profile));
+
+        Assert.Equal(MacroTriggerMode.ReleaseOnce,
+            loaded.Devices[0].Banks[0].Bindings[0].Macro.TriggerMode);
+    }
+
+    [Fact]
     public void ProfileRoundTripsTileAndTabbedLayoutPreferences()
     {
         var profile = new AppProfile
@@ -124,5 +148,33 @@ public sealed class ProfileTests
         var learned = Assert.Single(loaded.LearnedPedals);
         Assert.Equal("Custom pedal", learned.Name);
         Assert.Equal(3, learned.Switches.Count);
+    }
+
+    [Fact]
+    public void LearnedHardwareIdentityUsesDescriptorAndLegacyFallback()
+    {
+        var first = new LearnedPedalDefinition
+        {
+            VendorId = 0x1234, ProductId = 0x5678, ProductName = "Old name",
+            ReportLength = 8, ReportDescriptorHash = "AABB"
+        };
+        var renamed = new LearnedPedalDefinition
+        {
+            VendorId = 0x1234, ProductId = 0x5678, ProductName = "New name",
+            ReportLength = 16, ReportDescriptorHash = "aabb"
+        };
+        var changedDescriptor = new LearnedPedalDefinition
+        {
+            VendorId = 0x1234, ProductId = 0x5678, ProductName = "Old name",
+            ReportLength = 8, ReportDescriptorHash = "CCDD"
+        };
+        var legacy = new LearnedPedalDefinition
+        {
+            VendorId = 0x1234, ProductId = 0x5678, ProductName = "Old name", ReportLength = 8
+        };
+
+        Assert.True(first.MatchesHardwareIdentity(renamed));
+        Assert.False(first.MatchesHardwareIdentity(changedDescriptor));
+        Assert.True(first.MatchesHardwareIdentity(legacy));
     }
 }

@@ -11,6 +11,16 @@ namespace Tippy.App;
 
 public partial class MainWindow : Window
 {
+    [Flags]
+    private enum InputSuspensionReason
+    {
+        None = 0,
+        SessionLocked = 1,
+        RemoteDisconnected = 2,
+        ConsoleDisconnected = 4,
+        Power = 8
+    }
+
     private readonly ProfileStore _profileStore = new();
     private readonly PedalHidService _hid = new();
     private readonly VirtualGamepadService _gamepad = new();
@@ -19,13 +29,19 @@ public partial class MainWindow : Window
     private readonly Dictionary<string, PedalDeviceInfo> _connected = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<(string DeviceKey, int SwitchIndex), Border> _switchTiles = new();
     private readonly Dictionary<string, Border> _pedalTabHeaders = new(StringComparer.OrdinalIgnoreCase);
+    private readonly HashSet<(string DeviceKey, int SwitchIndex)> _pressedSwitches = [];
     private readonly Dictionary<(string DeviceKey, int SwitchIndex), MacroDefinition> _activeHeldMacros = new();
+    private readonly Dictionary<(string DeviceKey, int SwitchIndex), MacroDefinition> _pendingReleaseMacros = new();
     private readonly List<Button> _bankButtons = [];
+    private readonly object _inputStateGate = new();
     private AppProfile _profile = new();
     private CancellationTokenSource? _saveDebounce;
     private bool _loaded;
     private bool _updatingLayoutSelection;
     private bool _buildingTabbedLayout;
+    private volatile bool _inputSuspended;
+    private InputSuspensionReason _inputSuspensionReasons;
+    private int _inputStateGeneration;
     private string _lastOptimizationKey = string.Empty;
     private bool? _lastAutoSideBySide;
     private Point _pedalDragStart;
@@ -46,6 +62,8 @@ public partial class MainWindow : Window
         _hid.StateChanged += Hid_StateChanged;
         _hid.Diagnostic += (_, message) => Dispatcher.Invoke(() => SetStatus(message));
         _macroPlayer.PlaybackError += (_, error) => Dispatcher.Invoke(() => SetStatus(error, true));
+        SystemEvents.SessionSwitch += SystemEvents_SessionSwitch;
+        SystemEvents.PowerModeChanged += SystemEvents_PowerModeChanged;
     }
 
     private async void MainWindow_Loaded(object sender, RoutedEventArgs e)
@@ -71,7 +89,7 @@ public partial class MainWindow : Window
         RegisterBankHotkey();
         _hid.ConfigureLearnedDevices(_profile.LearnedPedals);
         _hid.Start();
-        SetStatus("Listening for Infinity / AltoEdge foot controls");
+        SetStatus("Listening for USB foot controls");
     }
 
     private void Hid_ConnectionChanged(object? sender, PedalConnectionEventArgs e)
@@ -90,9 +108,18 @@ public partial class MainWindow : Window
                     _profile.Devices.Add(deviceProfile);
                     ScheduleSave();
                 }
+                else if (deviceProfile.SwitchCount != e.Device.SwitchCount ||
+                         !deviceProfile.DisplayName.Equals(e.Device.DisplayName, StringComparison.Ordinal))
+                {
+                    deviceProfile.DisplayName = e.Device.DisplayName;
+                    deviceProfile.SwitchCount = e.Device.SwitchCount;
+                    deviceProfile.Normalize();
+                    ScheduleSave();
+                }
             }
             else
             {
+                ReleaseActionsForDevice(e.Device.DeviceKey);
                 _connected.Remove(e.Device.DeviceKey);
             }
             RefreshDevices(true);
@@ -102,30 +129,48 @@ public partial class MainWindow : Window
 
     private void Hid_StateChanged(object? sender, PedalStateEventArgs e)
     {
-        Dispatcher.Invoke(() =>
+        Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Send, new Action(() =>
         {
+            if (_inputSuspended) return;
             RawReportText.Text = $"{e.Device.DisplayName}: {Convert.ToHexString(e.RawReport)}";
             var triggerId = $"{e.Device.DeviceKey}:{e.SwitchIndex}";
             var key = (e.Device.DeviceKey, e.SwitchIndex);
+            if (e.IsPressed) _pressedSwitches.Add(key);
+            else _pressedSwitches.Remove(key);
             if (_switchTiles.TryGetValue(key, out var tile))
             {
-                tile.Background = e.IsPressed ? new SolidColorBrush(Color.FromArgb(145, 70, 205, 255)) : Brushes.Transparent;
-                tile.BorderBrush = e.IsPressed ? new SolidColorBrush(Color.FromRgb(86, 220, 255)) : Brushes.Transparent;
+                var generic = Equals(tile.Tag, "GenericSwitch");
+                tile.Background = e.IsPressed
+                    ? new SolidColorBrush(Color.FromArgb(145, 70, 205, 255))
+                    : generic ? (Brush)FindResource("SurfaceBrush") : Brushes.Transparent;
+                tile.BorderBrush = e.IsPressed
+                    ? new SolidColorBrush(Color.FromRgb(86, 220, 255))
+                    : generic ? (Brush)FindResource("BorderBrush") : Brushes.Transparent;
+                tile.BorderThickness = generic && !e.IsPressed ? new Thickness(2) : new Thickness(4);
                 tile.RenderTransform = e.IsPressed ? new ScaleTransform(0.985, 0.985) : Transform.Identity;
                 tile.RenderTransformOrigin = new Point(0.5, 0.5);
             }
             if (_pedalTabHeaders.TryGetValue(e.Device.DeviceKey, out var tabHeader))
             {
-                tabHeader.Background = e.IsPressed
+                var anyPressed = _pressedSwitches.Any(item =>
+                    item.DeviceKey.Equals(e.Device.DeviceKey, StringComparison.OrdinalIgnoreCase));
+                tabHeader.Background = anyPressed
                     ? (Brush)FindResource("AccentSoftBrush")
                     : Brushes.Transparent;
             }
 
             if (!e.IsPressed)
             {
-                if (_activeHeldMacros.Remove(key, out var heldMacro))
+                if (_activeHeldMacros.Remove(key, out _))
                 {
-                    _macroPlayer.Handle(triggerId, heldMacro, false);
+                    _macroPlayer.ReleaseHeld(triggerId);
+                }
+                if (_pendingReleaseMacros.Remove(key, out var releaseMacro))
+                {
+                    if (!e.IsSynthetic)
+                    {
+                        _macroPlayer.Handle(triggerId, releaseMacro, false);
+                    }
                 }
                 return;
             }
@@ -148,11 +193,34 @@ public partial class MainWindow : Window
                     {
                         _activeHeldMacros[key] = macro;
                     }
+                    else if (macro.TriggerMode == MacroTriggerMode.ReleaseOnce)
+                    {
+                        _pendingReleaseMacros[key] = macro;
+                    }
                     _macroPlayer.Handle(triggerId, macro, true);
                     SetStatus($"{e.Device.DisplayName} · Pedal {e.SwitchIndex + 1} · {binding.DisplayName}");
                     break;
             }
-        });
+        }));
+    }
+
+    private void ReleaseActionsForDevice(string deviceKey)
+    {
+        _pressedSwitches.RemoveWhere(key =>
+            key.DeviceKey.Equals(deviceKey, StringComparison.OrdinalIgnoreCase));
+        foreach (var key in _activeHeldMacros.Keys
+                     .Where(key => key.DeviceKey.Equals(deviceKey, StringComparison.OrdinalIgnoreCase))
+                     .ToArray())
+        {
+            _activeHeldMacros.Remove(key);
+            _macroPlayer.ReleaseHeld($"{key.DeviceKey}:{key.SwitchIndex}");
+        }
+        foreach (var key in _pendingReleaseMacros.Keys
+                     .Where(key => key.DeviceKey.Equals(deviceKey, StringComparison.OrdinalIgnoreCase))
+                     .ToArray())
+        {
+            _pendingReleaseMacros.Remove(key);
+        }
     }
 
     private void BuildBankButtons()
@@ -633,6 +701,12 @@ public partial class MainWindow : Window
 
     private FrameworkElement CreatePedalVisual(PedalDeviceProfile device, bool connected)
     {
+        if (device.VendorId != Tippy.Core.Input.InfinityReportDecoder.VendorId ||
+            device.ProductId != Tippy.Core.Input.InfinityReportDecoder.ProductId)
+        {
+            return CreateGenericPedalVisual(device, connected);
+        }
+
         var altoEdge = device.DisplayName.Contains("Alto", StringComparison.OrdinalIgnoreCase);
         var canvas = new Grid
         {
@@ -674,6 +748,40 @@ public partial class MainWindow : Window
                 : ShouldUseSideBySide() ? 325 : 440,
             HorizontalAlignment = HorizontalAlignment.Stretch,
             Child = canvas
+        };
+    }
+
+    private FrameworkElement CreateGenericPedalVisual(PedalDeviceProfile device, bool connected)
+    {
+        var columns = Math.Min(6, Math.Max(1, (int)Math.Ceiling(Math.Sqrt(device.SwitchCount))));
+        var rows = (int)Math.Ceiling(device.SwitchCount / (double)columns);
+        var panel = new System.Windows.Controls.Primitives.UniformGrid
+        {
+            Columns = columns,
+            Rows = rows,
+            Width = 760,
+            Height = Math.Clamp(rows * 185, 260, 740),
+            Background = (Brush)FindResource("SurfaceAltBrush")
+        };
+        for (var index = 0; index < device.SwitchCount; index++)
+        {
+            var tile = CreateSwitchOverlay(device, index, connected);
+            tile.Background = (Brush)FindResource("SurfaceBrush");
+            tile.BorderBrush = (Brush)FindResource("BorderBrush");
+            tile.BorderThickness = new Thickness(2);
+            tile.Tag = "GenericSwitch";
+            tile.ToolTip = $"Switch {index + 1}";
+            panel.Children.Add(tile);
+        }
+        return new Viewbox
+        {
+            Stretch = Stretch.Uniform,
+            StretchDirection = StretchDirection.DownOnly,
+            MaxHeight = _profile.PedalLayout == PedalLayoutMode.Tabbed
+                ? 485
+                : ShouldUseSideBySide() ? 325 : 440,
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+            Child = panel
         };
     }
 
@@ -797,6 +905,7 @@ public partial class MainWindow : Window
     {
         var menu = new System.Windows.Forms.ContextMenuStrip();
         menu.Items.Add("Show Tippy", null, (_, _) => Dispatcher.Invoke(RestoreFromTray));
+        menu.Items.Add("Release all held inputs", null, (_, _) => Dispatcher.Invoke(ReleaseAllInputs));
         menu.Items.Add(new System.Windows.Forms.ToolStripSeparator());
         menu.Items.Add("Exit", null, (_, _) => Dispatcher.Invoke(Close));
         _trayIcon = new System.Windows.Forms.NotifyIcon
@@ -812,6 +921,131 @@ public partial class MainWindow : Window
                 Dispatcher.Invoke(RestoreFromTray);
         };
         _trayIcon.DoubleClick += (_, _) => Dispatcher.Invoke(RestoreFromTray);
+    }
+
+    private void ReleaseAllInputs()
+    {
+        _macroPlayer.ReleaseAll();
+        ClearTrackedActions("Released all Tippy-held keyboard and gamepad inputs");
+    }
+
+    private void SystemEvents_SessionSwitch(object sender, SessionSwitchEventArgs e)
+    {
+        switch (e.Reason)
+        {
+            case SessionSwitchReason.SessionLock:
+            case SessionSwitchReason.SessionLogoff:
+                SuspendInput(InputSuspensionReason.SessionLocked);
+                break;
+            case SessionSwitchReason.SessionUnlock:
+            case SessionSwitchReason.SessionLogon:
+                ResumeInput(InputSuspensionReason.SessionLocked);
+                break;
+            case SessionSwitchReason.RemoteDisconnect:
+                SuspendInput(InputSuspensionReason.RemoteDisconnected);
+                break;
+            case SessionSwitchReason.RemoteConnect:
+                ResumeInput(InputSuspensionReason.RemoteDisconnected);
+                break;
+            case SessionSwitchReason.ConsoleDisconnect:
+                SuspendInput(InputSuspensionReason.ConsoleDisconnected);
+                break;
+            case SessionSwitchReason.ConsoleConnect:
+                ResumeInput(InputSuspensionReason.ConsoleDisconnected);
+                break;
+        }
+    }
+
+    private void SystemEvents_PowerModeChanged(object sender, PowerModeChangedEventArgs e)
+    {
+        if (e.Mode == PowerModes.Suspend)
+        {
+            SuspendInput(InputSuspensionReason.Power);
+        }
+        else if (e.Mode == PowerModes.Resume)
+        {
+            ResumeInput(InputSuspensionReason.Power);
+        }
+    }
+
+    private void SuspendInput(InputSuspensionReason reason)
+    {
+        int generation;
+        lock (_inputStateGate)
+        {
+            _inputSuspensionReasons |= reason;
+            _inputSuspended = true;
+            generation = ++_inputStateGeneration;
+            _macroPlayer.Suspend();
+        }
+        QueueSuspendedUiUpdate(generation);
+    }
+
+    private void ResumeInput(InputSuspensionReason reason)
+    {
+        int generation;
+        lock (_inputStateGate)
+        {
+            _inputSuspensionReasons &= ~reason;
+            generation = ++_inputStateGeneration;
+            if (_inputSuspensionReasons != InputSuspensionReason.None)
+            {
+                _inputSuspended = true;
+                QueueSuspendedUiUpdate(generation);
+                return;
+            }
+        }
+
+        if (Dispatcher.HasShutdownStarted) return;
+        Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Send, new Action(() =>
+        {
+            lock (_inputStateGate)
+            {
+                if (generation != _inputStateGeneration ||
+                    _inputSuspensionReasons != InputSuspensionReason.None)
+                {
+                    return;
+                }
+                _macroPlayer.Resume();
+                _inputSuspended = false;
+            }
+            _activeHeldMacros.Clear();
+            _pendingReleaseMacros.Clear();
+            _pressedSwitches.Clear();
+            RefreshDevices();
+            _ = _hid.ScanAsync();
+            SetStatus("USB foot-control input resumed");
+        }));
+    }
+
+    private void QueueSuspendedUiUpdate(int generation)
+    {
+        if (Dispatcher.HasShutdownStarted) return;
+        Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Send, new Action(() =>
+        {
+            lock (_inputStateGate)
+            {
+                if (generation != _inputStateGeneration ||
+                    _inputSuspensionReasons == InputSuspensionReason.None)
+                {
+                    return;
+                }
+                var sessionReasons = InputSuspensionReason.SessionLocked |
+                                     InputSuspensionReason.RemoteDisconnected |
+                                     InputSuspensionReason.ConsoleDisconnected;
+                var status = (_inputSuspensionReasons & sessionReasons) != 0
+                    ? "Input paused while Windows is locked or disconnected"
+                    : "Input paused while Windows is suspended";
+                ClearTrackedActions(status);
+            }
+        }));
+    }
+
+    private void ClearTrackedActions(string status)
+    {
+        _activeHeldMacros.Clear();
+        _pendingReleaseMacros.Clear();
+        SetStatus(status);
     }
 
     private void MinimizeToTray_Click(object sender, RoutedEventArgs e) => HideToTray();
@@ -1019,7 +1253,9 @@ public partial class MainWindow : Window
     {
         var wizard = new LearnPedalWindow { Owner = this };
         if (wizard.ShowDialog() != true || wizard.Result is null) return;
-        _profile.LearnedPedals.RemoveAll(item => item.Id.Equals(wizard.Result.Id, StringComparison.OrdinalIgnoreCase));
+        _profile.LearnedPedals.RemoveAll(item =>
+            item.Id.Equals(wizard.Result.Id, StringComparison.OrdinalIgnoreCase) ||
+            item.MatchesHardwareIdentity(wizard.Result));
         _profile.LearnedPedals.Add(wizard.Result);
         _hid.AddLearnedDevice(wizard.Result);
         ScheduleSave();
@@ -1076,6 +1312,8 @@ public partial class MainWindow : Window
 
     private void MainWindow_Closed(object? sender, EventArgs e)
     {
+        SystemEvents.SessionSwitch -= SystemEvents_SessionSwitch;
+        SystemEvents.PowerModeChanged -= SystemEvents_PowerModeChanged;
         _saveDebounce?.Cancel();
         try { _profileStore.SaveDefaultAsync(_profile).GetAwaiter().GetResult(); } catch { }
         if (_trayIcon is not null)

@@ -46,4 +46,34 @@ public sealed class LearnedReportDecoderTests
             [[0, 0], [0, 2], [0, 4]],
             [[0, 0], [0, 0], [0, 0]]));
     }
+
+    [Fact]
+    public void LearnsAndDecodesMoreThanThreeSwitches()
+    {
+        var builder = new LearnedDefinitionBuilder();
+        var definition = builder.Build("Five switch", "Buttons", 1, 2,
+            [[0, 1], [0, 2], [0, 4], [0, 8], [0, 16]],
+            [[0, 0], [0, 0], [0, 0], [0, 0], [0, 0]]);
+        var decoder = new LearnedReportDecoder(definition);
+        var state = new bool[5];
+
+        var changes = decoder.Decode([0, 25], state);
+
+        Assert.Equal(3, changes.Count);
+        Assert.Equal([true, false, false, true, true], state);
+        Assert.Equal(5, definition.Switches.Count);
+    }
+
+    [Fact]
+    public void RejectsDuplicateSwitchCaptures()
+    {
+        var builder = new LearnedDefinitionBuilder();
+
+        var error = Assert.Throws<InvalidDataException>(() => builder.Build(
+            "Duplicate", "Buttons", 1, 2,
+            [[0, 1], [0, 1], [0, 4]],
+            [[0, 0], [0, 0], [0, 0]]));
+
+        Assert.Contains("uniquely identifiable", error.Message);
+    }
 }

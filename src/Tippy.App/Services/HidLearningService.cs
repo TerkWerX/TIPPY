@@ -49,7 +49,7 @@ public sealed class HidLearningService
 
     public async Task<(byte[] Pressed, byte[] Released)> CapturePressReleaseAsync(
         HidCandidateInfo candidate,
-        IProgress<byte[]>? pressedProgress,
+        IProgress<HidCaptureProgress>? progress,
         CancellationToken cancellationToken)
     {
         var device = DeviceList.Local.GetHidDevices(candidate.VendorId, candidate.ProductId)
@@ -62,10 +62,35 @@ public sealed class HidLearningService
 
         using (stream)
         {
-            var pressed = await ReadNextAsync(stream, candidate.ReportLength, null, cancellationToken).ConfigureAwait(false);
-            pressedProgress?.Report(pressed);
+            progress?.Report(new HidCaptureProgress("Keep the switch released while Tippy arms the input."));
+            var baseline = await TryReadBaselineAsync(stream, candidate.ReportLength, cancellationToken).ConfigureAwait(false);
+            progress?.Report(new HidCaptureProgress("Armed — press and hold the switch now."));
+            var pressed = await ReadNextAsync(stream, candidate.ReportLength, baseline, cancellationToken).ConfigureAwait(false);
+            progress?.Report(new HidCaptureProgress(
+                $"Pressed {Convert.ToHexString(pressed)} — release the same switch.", pressed, true));
             var released = await ReadNextAsync(stream, candidate.ReportLength, pressed, cancellationToken).ConfigureAwait(false);
             return (pressed, released);
+        }
+    }
+
+    private static async Task<byte[]?> TryReadBaselineAsync(
+        HidStream stream,
+        int reportLength,
+        CancellationToken cancellationToken)
+    {
+        using var arming = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        arming.CancelAfter(TimeSpan.FromMilliseconds(350));
+        try
+        {
+            return await ReadNextAsync(stream, reportLength, null, arming.Token).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+        {
+            return null;
+        }
+        catch (TimeoutException) when (!cancellationToken.IsCancellationRequested)
+        {
+            return null;
         }
     }
 

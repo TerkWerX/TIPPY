@@ -15,6 +15,8 @@ public sealed class PedalHidService : IDisposable
     private readonly List<LearnedPedalDefinition> _learnedDefinitions = [];
     private readonly object _definitionGate = new();
     private readonly ConcurrentDictionary<string, DeviceReader> _readers = new();
+    private readonly ConcurrentDictionary<string, int> _retryAttempts = new(StringComparer.OrdinalIgnoreCase);
+    private readonly ConcurrentDictionary<string, byte> _scheduledRetries = new(StringComparer.OrdinalIgnoreCase);
     private readonly CancellationTokenSource _stopping = new();
     private int _scanning;
     private int _rescanRequested;
@@ -40,9 +42,11 @@ public sealed class PedalHidService : IDisposable
             foreach (var definition in definitions)
             {
                 definition.Normalize();
+                _learnedDefinitions.RemoveAll(item => item.MatchesHardwareIdentity(definition));
                 _learnedDefinitions.Add(definition);
             }
         }
+        RestartLearnedReaders();
     }
 
     public void AddLearnedDevice(LearnedPedalDefinition definition)
@@ -50,10 +54,28 @@ public sealed class PedalHidService : IDisposable
         definition.Normalize();
         lock (_definitionGate)
         {
-            _learnedDefinitions.RemoveAll(item => item.Id.Equals(definition.Id, StringComparison.OrdinalIgnoreCase));
+            _learnedDefinitions.RemoveAll(item =>
+                item.Id.Equals(definition.Id, StringComparison.OrdinalIgnoreCase) ||
+                item.MatchesHardwareIdentity(definition));
             _learnedDefinitions.Add(definition);
         }
+        RestartLearnedReaders(info =>
+            info.VendorId == definition.VendorId && info.ProductId == definition.ProductId);
         _ = ScanAsync();
+    }
+
+    private void RestartLearnedReaders(Func<PedalDeviceInfo, bool>? predicate = null)
+    {
+        foreach (var pair in _readers.ToArray())
+        {
+            if (!pair.Value.UsesLearnedDefinition || predicate is not null && !predicate(pair.Value.Info) ||
+                !_readers.TryRemove(pair.Key, out var reader))
+            {
+                continue;
+            }
+            reader.Dispose();
+            ConnectionChanged?.Invoke(this, new PedalConnectionEventArgs(reader.Info, false));
+        }
     }
 
     public async Task ScanAsync()
@@ -110,15 +132,19 @@ public sealed class PedalHidService : IDisposable
                     continue;
                 }
 
-                if (!reader.Start(_stopping.Token))
+                if (!reader.Start(_stopping.Token, () =>
+                    {
+                        Diagnostic?.Invoke(this, $"Opened {info.DisplayName} ({info.VidPid}).");
+                        ConnectionChanged?.Invoke(this, new PedalConnectionEventArgs(info, true));
+                    }))
                 {
                     _readers.TryRemove(key, out _);
                     reader.Dispose();
                     Diagnostic?.Invoke(this, $"Could not open {info.DisplayName} in shared HID mode.");
+                    ScheduleRetry(key);
                     continue;
                 }
-                Diagnostic?.Invoke(this, $"Opened {info.DisplayName} ({info.VidPid}).");
-                ConnectionChanged?.Invoke(this, new PedalConnectionEventArgs(info, true));
+                _ = ClearRetryAfterStableConnectionAsync(key, reader);
             }
 
             foreach (var pair in _readers.ToArray())
@@ -148,9 +174,9 @@ public sealed class PedalHidService : IDisposable
 
     private void DeviceListChanged(object? sender, DeviceListChangedEventArgs e) => _ = ScanAsync();
 
-    private void OnStateChanged(PedalDeviceInfo info, PedalTransition transition, byte[] report) =>
+    private void OnStateChanged(PedalDeviceInfo info, PedalTransition transition, byte[] report, bool isSynthetic) =>
         StateChanged?.Invoke(this,
-            new PedalStateEventArgs(info, transition.SwitchIndex, transition.IsPressed, report));
+            new PedalStateEventArgs(info, transition.SwitchIndex, transition.IsPressed, report, isSynthetic));
 
     private void OnReaderStopped(DeviceReader stopped, string? reason)
     {
@@ -158,6 +184,52 @@ public sealed class PedalHidService : IDisposable
         {
             Diagnostic?.Invoke(this, $"{stopped.Info.DisplayName} reader stopped{(string.IsNullOrWhiteSpace(reason) ? "." : $": {reason}")}");
             ConnectionChanged?.Invoke(this, new PedalConnectionEventArgs(stopped.Info, false));
+            stopped.Dispose();
+            ScheduleRetry(stopped.Info.DeviceKey);
+        }
+    }
+
+    private void ScheduleRetry(string deviceKey)
+    {
+        if (_stopping.IsCancellationRequested || !_scheduledRetries.TryAdd(deviceKey, 0))
+        {
+            return;
+        }
+        var attempt = _retryAttempts.AddOrUpdate(deviceKey, 1, (_, current) => Math.Min(current + 1, 6));
+        var delay = TimeSpan.FromSeconds(Math.Min(30, 1 << (attempt - 1)));
+        Diagnostic?.Invoke(this, $"Will retry HID {deviceKey} in {delay.TotalSeconds:0} second{(delay.TotalSeconds == 1 ? string.Empty : "s")}.");
+        _ = RetryScanAsync(deviceKey, delay);
+    }
+
+    private async Task RetryScanAsync(string deviceKey, TimeSpan delay)
+    {
+        try
+        {
+            await Task.Delay(delay, _stopping.Token).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException)
+        {
+            return;
+        }
+        finally
+        {
+            _scheduledRetries.TryRemove(deviceKey, out _);
+        }
+        await ScanAsync().ConfigureAwait(false);
+    }
+
+    private async Task ClearRetryAfterStableConnectionAsync(string deviceKey, DeviceReader reader)
+    {
+        try
+        {
+            await Task.Delay(TimeSpan.FromSeconds(10), _stopping.Token).ConfigureAwait(false);
+            if (_readers.TryGetValue(deviceKey, out var current) && ReferenceEquals(current, reader))
+            {
+                _retryAttempts.TryRemove(deviceKey, out _);
+            }
+        }
+        catch (OperationCanceledException)
+        {
         }
     }
 
@@ -198,11 +270,14 @@ public sealed class PedalHidService : IDisposable
         var descriptorHash = Convert.ToHexString(SHA256.HashData(device.GetRawReportDescriptor()));
         var reportLength = device.GetMaxInputReportLength();
         var definition = possibleDefinitions.FirstOrDefault(item =>
-                item.ReportLength == reportLength &&
-                (string.IsNullOrWhiteSpace(item.ProductName) ||
-                 item.ProductName.Equals(productName, StringComparison.OrdinalIgnoreCase)) &&
-                (string.IsNullOrWhiteSpace(item.ReportDescriptorHash) ||
-                 item.ReportDescriptorHash.Equals(descriptorHash, StringComparison.OrdinalIgnoreCase)));
+        {
+            var descriptorMatches = !string.IsNullOrWhiteSpace(item.ReportDescriptorHash) &&
+                                    item.ReportDescriptorHash.Equals(descriptorHash, StringComparison.OrdinalIgnoreCase);
+            var productMatches = string.IsNullOrWhiteSpace(item.ProductName) ||
+                                 item.ProductName.Equals(productName, StringComparison.OrdinalIgnoreCase);
+            return item.ReportLength <= reportLength &&
+                   (string.IsNullOrWhiteSpace(item.ReportDescriptorHash) ? productMatches : descriptorMatches);
+        });
         if (definition is null)
         {
             return null;
@@ -232,6 +307,8 @@ public sealed class PedalHidService : IDisposable
             reader.Dispose();
         }
         _readers.Clear();
+        _retryAttempts.Clear();
+        _scheduledRetries.Clear();
         _stopping.Dispose();
     }
 
@@ -239,18 +316,20 @@ public sealed class PedalHidService : IDisposable
     {
         private readonly HidDevice _device;
         private readonly IPedalReportDecoder _decoder;
-        private readonly Action<PedalDeviceInfo, PedalTransition, byte[]> _stateCallback;
+        private readonly Action<PedalDeviceInfo, PedalTransition, byte[], bool> _stateCallback;
         private readonly Action<DeviceReader, string?> _stoppedCallback;
-        private readonly bool[] _state = new bool[3];
+        private readonly bool[] _state;
+        private readonly object _stateGate = new();
         private HidStream? _stream;
         private CancellationTokenSource? _linkedCancellation;
         private int _disposed;
+        private int _releasedPressedState;
 
         public DeviceReader(
             HidDevice device,
             PedalDeviceInfo info,
             IPedalReportDecoder decoder,
-            Action<PedalDeviceInfo, PedalTransition, byte[]> stateCallback,
+            Action<PedalDeviceInfo, PedalTransition, byte[], bool> stateCallback,
             Action<DeviceReader, string?> stoppedCallback)
         {
             _device = device;
@@ -258,11 +337,13 @@ public sealed class PedalHidService : IDisposable
             _decoder = decoder;
             _stateCallback = stateCallback;
             _stoppedCallback = stoppedCallback;
+            _state = new bool[Math.Clamp(info.SwitchCount, 1, 32)];
         }
 
         public PedalDeviceInfo Info { get; }
+        public bool UsesLearnedDefinition => _decoder is LearnedReportDecoder;
 
-        public bool Start(CancellationToken stopping)
+        public bool Start(CancellationToken stopping, Action connectedCallback)
         {
             if (!_device.TryOpen(out var stream))
             {
@@ -271,7 +352,20 @@ public sealed class PedalHidService : IDisposable
 
             _stream = stream;
             _linkedCancellation = CancellationTokenSource.CreateLinkedTokenSource(stopping);
-            _ = ReadLoopAsync(_linkedCancellation.Token);
+            var token = _linkedCancellation.Token;
+            try
+            {
+                connectedCallback();
+            }
+            catch
+            {
+                Dispose();
+                return false;
+            }
+            if (Volatile.Read(ref _disposed) == 0)
+            {
+                _ = ReadLoopAsync(token);
+            }
             return true;
         }
 
@@ -300,17 +394,21 @@ public sealed class PedalHidService : IDisposable
                     }
 
                     var report = buffer.AsSpan(0, read).ToArray();
-                    foreach (var transition in _decoder.Decode(report, _state))
+                    lock (_stateGate)
                     {
-                        _stateCallback(Info, transition, report);
+                        foreach (var transition in _decoder.Decode(report, _state))
+                        {
+                            _stateCallback(Info, transition, report, false);
+                        }
                     }
                 }
             }
             catch (OperationCanceledException)
             {
             }
-            catch (IOException)
+            catch (IOException exception)
             {
+                stopReason = $"{exception.GetType().Name}: {exception.Message}";
             }
             catch (ObjectDisposedException)
             {
@@ -321,6 +419,7 @@ public sealed class PedalHidService : IDisposable
             }
             finally
             {
+                ReleasePressedState();
                 if (Volatile.Read(ref _disposed) == 0)
                 {
                     _stoppedCallback(this, stopReason);
@@ -335,8 +434,29 @@ public sealed class PedalHidService : IDisposable
                 return;
             }
             _linkedCancellation?.Cancel();
+            ReleasePressedState();
             _stream?.Dispose();
             _linkedCancellation?.Dispose();
+        }
+
+        private void ReleasePressedState()
+        {
+            if (Interlocked.Exchange(ref _releasedPressedState, 1) != 0)
+            {
+                return;
+            }
+            lock (_stateGate)
+            {
+                for (var index = 0; index < _state.Length; index++)
+                {
+                    if (!_state[index])
+                    {
+                        continue;
+                    }
+                    _state[index] = false;
+                    _stateCallback(Info, new PedalTransition(index, false), [], true);
+                }
+            }
         }
     }
 }

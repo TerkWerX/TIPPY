@@ -10,20 +10,21 @@ namespace Tippy.App;
 
 public partial class LearnPedalWindow : Window
 {
+    private const int MaximumLearnedSwitches = 32;
     private readonly HidLearningService _learning = new();
-    private readonly byte[]?[] _pressed = new byte[3][];
-    private readonly byte[]?[] _released = new byte[3][];
-    private readonly Button[] _captureButtons = new Button[3];
-    private readonly TextBlock[] _stepStatuses = new TextBlock[3];
+    private byte[]?[] _pressed = [];
+    private byte[]?[] _released = [];
+    private Button[] _captureButtons = [];
+    private TextBlock[] _stepStatuses = [];
     private CancellationTokenSource? _captureCancellation;
     private bool _busy;
 
     public LearnPedalWindow()
     {
         InitializeComponent();
-        BuildCaptureStep(LeftStep, 0, "LEFT SWITCH");
-        BuildCaptureStep(CenterStep, 1, "CENTER SWITCH");
-        BuildCaptureStep(RightStep, 2, "RIGHT SWITCH");
+        SwitchCountBox.ItemsSource = Enumerable.Range(1, MaximumLearnedSwitches);
+        SwitchCountBox.SelectedItem = 3;
+        ConfigureSwitchCount(3);
         Loaded += (_, _) => RefreshCandidates();
         Closed += (_, _) => _captureCancellation?.Cancel();
     }
@@ -32,15 +33,24 @@ public partial class LearnPedalWindow : Window
 
     private HidCandidateInfo? SelectedCandidate => CandidateBox.SelectedItem as HidCandidateInfo;
 
-    private void BuildCaptureStep(Border host, int index, string label)
+    private void BuildCaptureStep(int index)
     {
+        var host = new Border
+        {
+            Background = (Brush)FindResource("SurfaceAltBrush"),
+            BorderBrush = (Brush)FindResource("BorderBrush"),
+            BorderThickness = new Thickness(1),
+            CornerRadius = new CornerRadius(8),
+            Padding = new Thickness(13),
+            Margin = new Thickness(0, 0, 0, 8)
+        };
         var grid = new Grid();
         grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(140) });
         grid.ColumnDefinitions.Add(new ColumnDefinition());
         grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         grid.Children.Add(new TextBlock
         {
-            Text = label, FontSize = 11, FontWeight = FontWeights.Bold,
+            Text = SwitchLabel(index), FontSize = 11, FontWeight = FontWeights.Bold,
             Foreground = (Brush)FindResource("MutedTextBrush"), VerticalAlignment = VerticalAlignment.Center
         });
         var status = new TextBlock
@@ -57,7 +67,37 @@ public partial class LearnPedalWindow : Window
         Grid.SetColumn(button, 2);
         grid.Children.Add(button);
         host.Child = grid;
+        SwitchStepsPanel.Children.Add(host);
     }
+
+    private void SwitchCountBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (_busy || SwitchCountBox.SelectedItem is not int switchCount)
+        {
+            return;
+        }
+        ConfigureSwitchCount(switchCount);
+    }
+
+    private void ConfigureSwitchCount(int switchCount)
+    {
+        switchCount = Math.Clamp(switchCount, 1, MaximumLearnedSwitches);
+        _pressed = new byte[switchCount][];
+        _released = new byte[switchCount][];
+        _captureButtons = new Button[switchCount];
+        _stepStatuses = new TextBlock[switchCount];
+        SwitchStepsPanel.Children.Clear();
+        for (var index = 0; index < switchCount; index++)
+        {
+            BuildCaptureStep(index);
+        }
+        FinishButton.IsEnabled = false;
+        ResultHint.Text = $"Capture all {switchCount} switch{(switchCount == 1 ? string.Empty : "es")} to finish.";
+    }
+
+    private string SwitchLabel(int index) => _captureButtons.Length == 3
+        ? index switch { 0 => "LEFT SWITCH", 1 => "CENTER SWITCH", _ => "RIGHT SWITCH" }
+        : $"SWITCH {index + 1}";
 
     private void Refresh_Click(object sender, RoutedEventArgs e) => RefreshCandidates();
 
@@ -94,14 +134,16 @@ public partial class LearnPedalWindow : Window
         SetControlsEnabled(false);
         _captureButtons[index].IsEnabled = true;
         _captureButtons[index].Content = "Listening…";
-        _stepStatuses[index].Text = "Press and hold this switch now";
+        _stepStatuses[index].Text = "Keep this switch released while Tippy arms";
         _stepStatuses[index].Foreground = (Brush)FindResource("PressedBrush");
-        LearningHint.Text = "Listening for the first changed HID report…";
+        LearningHint.Text = "Wait for the armed message before pressing the switch.";
         _captureCancellation = new CancellationTokenSource(TimeSpan.FromSeconds(30));
-        var progress = new Progress<byte[]>(report =>
+        var progress = new Progress<HidCaptureProgress>(capture =>
         {
-            _stepStatuses[index].Text = $"Pressed {Convert.ToHexString(report)} · release it now";
-            LearningHint.Text = "Press captured. Release the same switch.";
+            _stepStatuses[index].Text = capture.Message;
+            LearningHint.Text = capture.PressCaptured
+                ? "Press captured. Release the same switch."
+                : capture.Message;
         });
 
         try
@@ -131,7 +173,9 @@ public partial class LearnPedalWindow : Window
             _busy = false;
             SetControlsEnabled(true);
             FinishButton.IsEnabled = _pressed.All(report => report is not null) && _released.All(report => report is not null);
-            ResultHint.Text = FinishButton.IsEnabled ? "All switches captured. Save when ready." : "Capture all three switches to finish.";
+            ResultHint.Text = FinishButton.IsEnabled
+                ? "All switches captured. Save when ready."
+                : $"Capture all {_pressed.Length} switch{(_pressed.Length == 1 ? string.Empty : "es")} to finish.";
         }
     }
 
@@ -139,6 +183,7 @@ public partial class LearnPedalWindow : Window
     {
         CandidateBox.IsEnabled = enabled;
         MappingNameBox.IsEnabled = enabled;
+        SwitchCountBox.IsEnabled = enabled;
         foreach (var button in _captureButtons) button.IsEnabled = enabled;
     }
 
@@ -147,7 +192,7 @@ public partial class LearnPedalWindow : Window
         if (_busy) return;
         Array.Clear(_pressed);
         Array.Clear(_released);
-        for (var index = 0; index < 3; index++)
+        for (var index = 0; index < _stepStatuses.Length; index++)
         {
             if (_stepStatuses[index] is null) continue;
             _stepStatuses[index].Text = "Not captured";
@@ -155,6 +200,7 @@ public partial class LearnPedalWindow : Window
             _captureButtons[index].Content = "Capture";
         }
         FinishButton.IsEnabled = false;
+        ResultHint.Text = $"Capture all {_pressed.Length} switch{(_pressed.Length == 1 ? string.Empty : "es")} to finish.";
     }
 
     private void Finish_Click(object sender, RoutedEventArgs e)

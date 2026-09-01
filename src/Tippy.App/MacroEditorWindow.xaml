@@ -28,6 +28,7 @@
                 <ComboBox x:Name="TriggerModeBox">
                     <ComboBoxItem Tag="PressOnce"><TextBlock Text="Run once when pressed" Foreground="#111820"/></ComboBoxItem>
                     <ComboBoxItem Tag="WhileHeld"><TextBlock Text="Hold keys/buttons until released" Foreground="#111820"/></ComboBoxItem>
+                    <ComboBoxItem Tag="ReleaseOnce"><TextBlock Text="Run once when released" Foreground="#111820"/></ComboBoxItem>
                 </ComboBox>
             </StackPanel>
         </Grid>

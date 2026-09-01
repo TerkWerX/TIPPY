@@ -13,3 +13,5 @@ public sealed record HidCandidateInfo(
     public string DisplayName =>
         $"{(LooksLikePedal ? "★ " : string.Empty)}{ProductName}  ·  VID_{VendorId:X4} PID_{ProductId:X4}  ·  {ReportLength} bytes";
 }
+
+public sealed record HidCaptureProgress(string Message, byte[]? Report = null, bool PressCaptured = false);

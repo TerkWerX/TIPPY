@@ -83,6 +83,33 @@ public sealed class LearnedDefinitionBuilder
             definition.Switches.Add(rule);
         }
         definition.Normalize();
+        ValidateSamples(definition, pressedReports, releasedReports);
         return definition;
+    }
+
+    private static void ValidateSamples(
+        LearnedPedalDefinition definition,
+        IReadOnlyList<byte[]> pressedReports,
+        IReadOnlyList<byte[]> releasedReports)
+    {
+        var decoder = new LearnedReportDecoder(definition);
+        for (var switchIndex = 0; switchIndex < definition.Switches.Count; switchIndex++)
+        {
+            var state = new bool[definition.Switches.Count];
+            var pressedChanges = decoder.Decode(pressedReports[switchIndex], state);
+            if (pressedChanges.Count != 1 || pressedChanges[0] != new PedalTransition(switchIndex, true))
+            {
+                throw new InvalidDataException(
+                    $"Switch {switchIndex + 1} is not uniquely identifiable. Recapture it with every other switch released.");
+            }
+
+            var releasedChanges = decoder.Decode(releasedReports[switchIndex], state);
+            if (releasedChanges.Count != 1 || releasedChanges[0] != new PedalTransition(switchIndex, false) ||
+                state.Any(pressed => pressed))
+            {
+                throw new InvalidDataException(
+                    $"Switch {switchIndex + 1} did not produce a unique release. Recapture it carefully.");
+            }
+        }
     }
 }

@@ -17,7 +17,9 @@
 
 Tippy is a Windows 11 utility for people who want useful work and gameplay controls under their feet without dragging along a full transcription suite. It supports multiple pedals at once, gives every connected pedal its own three macro banks, and makes assignments visible at a glance.
 
-> Tippy is under active development. The Infinity IN-USB-2 Version 14 and AltoEdge IN-AE-S Version 14 are the first verified devices; the built-in learning wizard can teach Tippy additional USB HID pedals.
+The [compatibility and reliability direction](docs/COMPATIBILITY.md) documents Tippy's support tiers, safety guarantees, hardware limits, and roadmap for bringing additional USB pedals back into useful service.
+
+> Tippy is under active development. The Infinity IN-USB-2 Version 14 and AltoEdge IN-AE-S Version 14 are the first verified devices; the built-in learning wizard can teach Tippy additional raw-HID controls with 1–32 digital switches.
 
 ## See Tippy in action
 
@@ -82,6 +84,8 @@ The two verified pedals use the same three-button HID protocol. Tippy distinguis
 
 Choose **Edit assignment** to search Windows or application shortcuts, type a string, capture a key combination, or record a timed sequence. Select Bank 1, 2, or 3 inside a pedal card to change only that pedal. The **All pedals** bank buttons and default `Ctrl+Alt+B` shortcut switch every connected pedal together.
 
+Every assignment can run when pressed, hold keyboard/gamepad output until the pedal is released, or run when released. Held outputs are reference-counted across simultaneous pedals and are released automatically if a pedal disconnects; **Release all held inputs** is also available from Tippy's tray menu.
+
 Assign **Switch to next bank** to a footswitch when you want completely hands-free bank changes. Use **Save bank**, **Load bank**, or **Copy to…** to reuse a setup on any compatible connected pedal.
 
 Tippy autosaves its live profile here:
@@ -96,8 +100,9 @@ Portable profiles use `.tippy.json`; portable banks use `.tippy-bank.json`.
 
 1. Select **Learn new pedal** beside **Scan USB**.
 2. Pick the device from the HID list. Likely pedal devices are marked with a star.
-3. Release every switch, then capture each switch when prompted.
-4. Save the mapping and begin assigning actions immediately.
+3. Choose the number of digital switches, from 1 through 32.
+4. Keep each switch released while Tippy arms it, then capture it when prompted.
+5. Save the mapping and begin assigning actions immediately.
 
 The learned definition stores USB identity, a report-descriptor fingerprint, and switch rules. It does not record normal keyboard typing.
 
