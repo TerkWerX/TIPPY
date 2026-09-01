@@ -59,7 +59,7 @@ The searchable catalog currently includes 557 commands across 32 Windows applica
 - Send MIDI notes/CC/program changes and OSC messages to DAWs, streaming tools, lighting software, and other creative applications.
 - Hold continuous cursor movement, vertical/horizontal scrolling, and mouse-button drags underfoot.
 - Arrange pedal cards automatically, stacked, side by side, or in a tile grid with automatic or 1–6-column placement.
-- Use a distinct compact tabbed mode to show one full-size pedal at a time without losing its controls.
+- Click the always-visible **Compact view** button (or press `F11`) for a distinct pedal-only view that hides the full menus, preserves full-size pedal artwork, and shows one pedal at a time with tabs when several are connected. **Full view**, `Esc`, or `F11` restores the complete interface.
 - Drag pedal cards or compact tabs to match their physical order.
 - Reopen on the same monitor at the previous position and size; layout changes stay anchored to that monitor instead of recentering.
 - See the pressed switch illuminate in real time.

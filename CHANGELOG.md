@@ -6,6 +6,7 @@ Notable changes to Tippy are documented here.
 
 ### Added
 
+- A clearly labeled, profile-persistent Compact view independent of pedal layout, with pedal-only chrome, full-size artwork, multi-pedal tabs, essential bank/edit controls, and Full view/Esc/F11 escape paths.
 - Selectable per-profile Windows MIDI outputs, live note-on/note-off device testing, explicit note-off messages, strict MIDI value validation, endpoint reconnect handling, and accurate WinMM error reporting.
 - Five-second branded splash presentation with a white Tippy title and `by TerkWerX.com © 2026` credit.
 - Persistent main-window monitor, position, normal size, maximized state, pedal layout, tile columns, and selected compact pedal tab.

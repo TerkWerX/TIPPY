@@ -1,5 +1,6 @@
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using Microsoft.Win32;
@@ -464,7 +465,7 @@ public partial class MainWindow : Window
         var count = _profile.Devices.Count;
 
         ApplyLayoutChrome();
-        if (_profile.PedalLayout == PedalLayoutMode.Tabbed && count > 0)
+        if (UsesTabbedPedalPresentation() && count > 0)
         {
             BuildTabbedDeviceLayout();
         }
@@ -646,7 +647,7 @@ public partial class MainWindow : Window
         headerTools.Children.Add(badge);
         Grid.SetColumn(headerTools, 2);
         header.Children.Add(headerTools);
-        stack.Children.Add(header);
+        if (!_profile.IsCompactMode) stack.Children.Add(header);
         stack.Children.Add(CreateDeviceBankBar(device, compact));
         stack.Children.Add(CreatePedalVisual(device, connected));
         return shell;
@@ -696,18 +697,21 @@ public partial class MainWindow : Window
         }
         grid.Children.Add(bankPanel);
 
-        var tools = new StackPanel { Orientation = Orientation.Horizontal };
-        var save = new Button { Content = "Save bank", Padding = new Thickness(9, 4, 9, 4), Margin = new Thickness(0, 0, 5, 0) };
-        save.Click += async (_, _) => await SavePedalBankAsync(device);
-        var load = new Button { Content = "Load bank", Padding = new Thickness(9, 4, 9, 4), Margin = new Thickness(0, 0, 5, 0) };
-        load.Click += async (_, _) => await LoadPedalBankAsync(device);
-        var copy = new Button { Content = "Copy to…", Padding = new Thickness(9, 4, 9, 4), ToolTip = "Copy this bank to one or more compatible pedals" };
-        copy.Click += (_, _) => CopyPedalBank(device);
-        tools.Children.Add(save);
-        tools.Children.Add(load);
-        tools.Children.Add(copy);
-        Grid.SetColumn(tools, 1);
-        grid.Children.Add(tools);
+        if (!_profile.IsCompactMode)
+        {
+            var tools = new StackPanel { Orientation = Orientation.Horizontal };
+            var save = new Button { Content = "Save bank", Padding = new Thickness(9, 4, 9, 4), Margin = new Thickness(0, 0, 5, 0) };
+            save.Click += async (_, _) => await SavePedalBankAsync(device);
+            var load = new Button { Content = "Load bank", Padding = new Thickness(9, 4, 9, 4), Margin = new Thickness(0, 0, 5, 0) };
+            load.Click += async (_, _) => await LoadPedalBankAsync(device);
+            var copy = new Button { Content = "Copy to…", Padding = new Thickness(9, 4, 9, 4), ToolTip = "Copy this bank to one or more compatible pedals" };
+            copy.Click += (_, _) => CopyPedalBank(device);
+            tools.Children.Add(save);
+            tools.Children.Add(load);
+            tools.Children.Add(copy);
+            Grid.SetColumn(tools, 1);
+            grid.Children.Add(tools);
+        }
         return bar;
     }
 
@@ -946,7 +950,7 @@ public partial class MainWindow : Window
         {
             Stretch = Stretch.Uniform,
             StretchDirection = StretchDirection.DownOnly,
-            MaxHeight = _profile.PedalLayout == PedalLayoutMode.Tabbed
+            MaxHeight = UsesTabbedPedalPresentation()
                 ? 485
                 : ShouldUseSideBySide() ? 325 : 440,
             HorizontalAlignment = HorizontalAlignment.Stretch,
@@ -992,7 +996,7 @@ public partial class MainWindow : Window
         {
             Stretch = Stretch.Uniform,
             StretchDirection = StretchDirection.DownOnly,
-            MaxHeight = _profile.PedalLayout == PedalLayoutMode.Tabbed
+            MaxHeight = UsesTabbedPedalPresentation()
                 ? 485
                 : ShouldUseSideBySide() ? 325 : 440,
             HorizontalAlignment = HorizontalAlignment.Stretch,
@@ -1570,6 +1574,32 @@ public partial class MainWindow : Window
 
     private void MinimizeToTray_Click(object sender, RoutedEventArgs e) => HideToTray();
 
+    private void CompactMode_Click(object sender, RoutedEventArgs e) => SetCompactMode(true);
+
+    private void ExitCompactMode_Click(object sender, RoutedEventArgs e) => SetCompactMode(false);
+
+    private void MainWindow_PreviewKeyDown(object sender, KeyEventArgs e)
+    {
+        if (e.Key == Key.F11 || (_profile.IsCompactMode && e.Key == Key.Escape))
+        {
+            SetCompactMode(!_profile.IsCompactMode);
+            e.Handled = true;
+        }
+    }
+
+    private void SetCompactMode(bool enabled)
+    {
+        if (_profile.IsCompactMode == enabled) return;
+        if (WindowState == WindowState.Maximized) WindowState = WindowState.Normal;
+        _profile.IsCompactMode = enabled;
+        _lastOptimizationKey = string.Empty;
+        RefreshDevices(true);
+        ScheduleSave();
+        SetStatus(enabled
+            ? "Compact pedal view active · press Esc or F11 for the full interface"
+            : "Full interface restored");
+    }
+
     private void HideToTray()
     {
         if (_trayIcon is null) return;
@@ -1680,9 +1710,14 @@ public partial class MainWindow : Window
 
     private void ApplyLayoutChrome()
     {
-        var compact = _profile.PedalLayout == PedalLayoutMode.Tabbed;
-        MinWidth = compact ? 880 : 920;
-        MinHeight = compact ? 760 : 650;
+        var compact = _profile.IsCompactMode;
+        MinWidth = compact ? 840 : 920;
+        MinHeight = compact ? 700 : 650;
+        CompactModeBar.Visibility = compact ? Visibility.Visible : Visibility.Collapsed;
+        HeaderBorder.Visibility = compact ? Visibility.Collapsed : Visibility.Visible;
+        AllPedalsBorder.Visibility = compact ? Visibility.Collapsed : Visibility.Visible;
+        DevicesToolbar.Visibility = compact ? Visibility.Collapsed : Visibility.Visible;
+        StatusBorder.Visibility = compact ? Visibility.Collapsed : Visibility.Visible;
         HeaderBorder.Padding = compact ? new Thickness(12, 6, 12, 6) : new Thickness(20, 8, 20, 8);
         BrandBadge.Padding = compact ? new Thickness(6, 2, 8, 3) : new Thickness(8, 3, 10, 4);
         HeaderMascot.Width = compact ? 52 : 66;
@@ -1704,6 +1739,9 @@ public partial class MainWindow : Window
             ? Visibility.Visible
             : Visibility.Collapsed;
     }
+
+    private bool UsesTabbedPedalPresentation() =>
+        _profile.IsCompactMode || _profile.PedalLayout == PedalLayoutMode.Tabbed;
 
     private void MainWindow_SizeChanged(object sender, SizeChangedEventArgs e)
     {
@@ -1742,9 +1780,15 @@ public partial class MainWindow : Window
         var optimizationKey = GetWindowOptimizationKey();
         if (optimizationKey == _lastOptimizationKey) return;
         _lastOptimizationKey = optimizationKey;
+        if (_profile.IsCompactMode)
+        {
+            _windowPlacement.ResizeWithinCurrentMonitor(this, 840, 720, 12);
+            RememberWindowPlacement();
+            return;
+        }
         if (_profile.PedalLayout == PedalLayoutMode.Tabbed)
         {
-            _windowPlacement.ResizeWithinCurrentMonitor(this, 880, 885, 16);
+            _windowPlacement.ResizeWithinCurrentMonitor(this, 1050, 900, 16);
             RememberWindowPlacement();
             return;
         }
@@ -1781,7 +1825,7 @@ public partial class MainWindow : Window
     }
 
     private string GetWindowOptimizationKey() =>
-        $"{Math.Max(1, _profile.Devices.Count)}:{_profile.PedalLayout}:{_profile.TileColumns}";
+        $"{Math.Max(1, _profile.Devices.Count)}:{_profile.PedalLayout}:{_profile.TileColumns}:{_profile.IsCompactMode}";
 
     private void Theme_Click(object sender, RoutedEventArgs e)
     {

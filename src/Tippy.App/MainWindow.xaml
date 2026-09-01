@@ -4,7 +4,8 @@
         Title="Tippy — Foot Control Macros" Height="820" Width="1240"
         MinHeight="650" MinWidth="920" WindowStartupLocation="CenterScreen"
         Icon="/Tippy;component/Assets/Icons/tippy.ico"
-        Background="{DynamicResource BackgroundBrush}" Foreground="{DynamicResource TextBrush}">
+        Background="{DynamicResource BackgroundBrush}" Foreground="{DynamicResource TextBrush}"
+        PreviewKeyDown="MainWindow_PreviewKeyDown">
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
@@ -12,6 +13,17 @@
             <RowDefinition Height="*"/>
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
+
+        <Border x:Name="CompactModeBar" Grid.Row="0" Background="{DynamicResource SurfaceBrush}"
+                BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,0,0,1"
+                Padding="10,7" Visibility="Collapsed">
+            <Grid>
+                <TextBlock Text="Compact pedal view" Style="{StaticResource SmallMutedText}"
+                           VerticalAlignment="Center" FontWeight="SemiBold"/>
+                <Button Content="Full view" Click="ExitCompactMode_Click" HorizontalAlignment="Right"
+                        Padding="12,5" ToolTip="Restore Tippy's complete interface (Esc or F11)"/>
+            </Grid>
+        </Border>
 
         <Border x:Name="HeaderBorder" Grid.Row="0" Background="{DynamicResource SurfaceBrush}"
                 BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,0,0,1" Padding="24,18">
@@ -50,6 +62,8 @@
                     <Button Content="App profiles" Click="ApplicationProfiles_Click" Margin="0,0,8,0"/>
                     <Button Content="Settings" Click="Settings_Click" Margin="0,0,8,0"/>
                     <Button Content="To tray" Click="MinimizeToTray_Click" Margin="0,0,8,0" ToolTip="Keep Tippy running in the notification area"/>
+                    <Button x:Name="CompactModeButton" Content="Compact view" Click="CompactMode_Click" Margin="0,0,8,0"
+                            ToolTip="Hide menus and show one full-size pedal at a time (F11)"/>
                     <Button Content="Tools" Click="Tools_Click" Margin="0,0,8,0"/>
                     <Button Content="Help" Click="Help_Click" Margin="0,0,8,0"/>
                     <Button x:Name="ThemeButton" Content="Light mode" Click="Theme_Click"/>
@@ -92,7 +106,7 @@
                             <ComboBoxItem Tag="Stacked"><TextBlock Text="Stacked" Foreground="#111820"/></ComboBoxItem>
                             <ComboBoxItem Tag="SideBySide"><TextBlock Text="Side by side" Foreground="#111820"/></ComboBoxItem>
                             <ComboBoxItem Tag="Tiled"><TextBlock Text="Tiles" Foreground="#111820"/></ComboBoxItem>
-                            <ComboBoxItem Tag="Tabbed"><TextBlock Text="Tabbed" Foreground="#111820"/></ComboBoxItem>
+                            <ComboBoxItem Tag="Tabbed"><TextBlock Text="Tabbed pedals" Foreground="#111820"/></ComboBoxItem>
                         </ComboBox>
                         <StackPanel x:Name="TileColumnsPanel" Orientation="Horizontal" Visibility="Collapsed" Margin="0,0,12,0">
                             <TextBlock Text="Columns" Style="{StaticResource SmallMutedText}" VerticalAlignment="Center" Margin="0,0,7,0"/>

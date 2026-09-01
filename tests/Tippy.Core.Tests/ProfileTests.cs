@@ -64,7 +64,7 @@ public sealed class ProfileTests
 
         var loaded = new ProfileSerializer().Deserialize(json);
 
-        Assert.Equal(8, loaded.SchemaVersion);
+        Assert.Equal(9, loaded.SchemaVersion);
         Assert.All(loaded.Devices, device => Assert.Equal(2, device.ActiveBankIndex));
     }
 
@@ -119,6 +119,7 @@ public sealed class ProfileTests
         {
             PedalLayout = PedalLayoutMode.Tiled,
             TileColumns = 4,
+            IsCompactMode = true,
             SelectedTabbedDeviceKey = "right-pedal"
         };
 
@@ -127,6 +128,7 @@ public sealed class ProfileTests
 
         Assert.Equal(PedalLayoutMode.Tiled, loaded.PedalLayout);
         Assert.Equal(4, loaded.TileColumns);
+        Assert.True(loaded.IsCompactMode);
         Assert.Equal("right-pedal", loaded.SelectedTabbedDeviceKey);
     }
 
@@ -181,7 +183,7 @@ public sealed class ProfileTests
         var serializer = new ProfileSerializer();
         var loaded = serializer.Deserialize(serializer.Serialize(profile));
 
-        Assert.Equal(8, loaded.SchemaVersion);
+        Assert.Equal(9, loaded.SchemaVersion);
         var learned = Assert.Single(loaded.LearnedPedals);
         Assert.Equal("Custom pedal", learned.Name);
         Assert.Equal(3, learned.Switches.Count);
@@ -325,7 +327,7 @@ public sealed class ProfileTests
         var serializer = new ProfileSerializer();
         var loaded = serializer.Deserialize(serializer.Serialize(profile));
 
-        Assert.Equal(8, loaded.SchemaVersion);
+        Assert.Equal(9, loaded.SchemaVersion);
         Assert.Equal("Tippy", Assert.Single(loaded.Variables).Value);
         Assert.Equal(45, loaded.Safety.MaximumMacroSeconds);
         Assert.True(loaded.Overlay.Enabled);
