@@ -14,13 +14,16 @@
                 <RowDefinition Height="*"/>
                 <RowDefinition Height="Auto"/>
                 <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
             </Grid.RowDefinitions>
             <Image Source="/Tippy;component/Assets/Branding/tippy-toes-tippy.png"
                    Stretch="Uniform" Margin="24,4" SnapsToDevicePixels="True"/>
             <TextBlock Grid.Row="1" Text="TIPPY" FontSize="34" FontWeight="Bold"
-                       HorizontalAlignment="Center" Margin="0,8,0,0"/>
+                       Foreground="#FFFFFF" HorizontalAlignment="Center" Margin="0,8,0,0"/>
             <TextBlock Grid.Row="2" Text="Foot control → fast macros" Style="{StaticResource SmallMutedText}"
                        HorizontalAlignment="Center" Margin="0,4,0,2"/>
+            <TextBlock Grid.Row="3" Text="by TerkWerX.com © 2026" FontSize="15" FontWeight="SemiBold"
+                       Foreground="#C8D3DF" HorizontalAlignment="Center" Margin="0,7,0,0"/>
         </Grid>
     </Border>
 </Window>

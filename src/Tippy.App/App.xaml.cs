@@ -5,6 +5,7 @@ namespace Tippy.App;
 
 public partial class App : Application
 {
+    private const int SplashDurationMilliseconds = 5_000;
     private Mutex? _singleInstance;
 
     protected override async void OnStartup(StartupEventArgs e)
@@ -24,7 +25,7 @@ public partial class App : Application
         var visibleFor = Stopwatch.StartNew();
 
         var mainWindow = new MainWindow();
-        int remaining = Math.Max(0, 3000 - (int)visibleFor.ElapsedMilliseconds);
+        int remaining = Math.Max(0, SplashDurationMilliseconds - (int)visibleFor.ElapsedMilliseconds);
         if (remaining > 0)
         {
             await Task.Delay(remaining);

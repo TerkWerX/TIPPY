@@ -6,6 +6,7 @@ Notable changes to Tippy are documented here.
 
 ### Added
 
+- Five-second branded splash presentation with a white Tippy title and `by TerkWerX.com © 2026` credit.
 - Persistent main-window monitor, position, normal size, maximized state, pedal layout, tile columns, and selected compact pedal tab.
 
 - Adjustable per-switch double-tap, long-press, repeat-while-held, and toggle behaviors with explicit conflict validation.
