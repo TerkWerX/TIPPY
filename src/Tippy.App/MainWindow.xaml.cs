@@ -654,11 +654,10 @@ public partial class MainWindow : Window
         var text = new TextBlock
         {
             Text = $"{(connected ? "●" : "○")}  {device.DisplayName}",
-            Foreground = new SolidColorBrush(connected
-                ? Color.FromRgb(17, 24, 32)
-                : Color.FromRgb(82, 94, 108)),
             FontWeight = FontWeights.SemiBold
         };
+        text.SetResourceReference(TextBlock.ForegroundProperty,
+            connected ? "TextBrush" : "MutedTextBrush");
         var header = new Border
         {
             Tag = device.DeviceKey,

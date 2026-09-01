@@ -85,7 +85,7 @@
         <TabControl x:Name="MacroArea" Grid.Row="2" Background="{DynamicResource SurfaceBrush}"
                     BorderBrush="{DynamicResource BorderBrush}" Foreground="{DynamicResource TextBrush}">
             <TabItem>
-                <TabItem.Header><TextBlock Text="Windows shortcuts" Foreground="#111820"/></TabItem.Header>
+                <TabItem.Header><TextBlock Text="Windows shortcuts" Foreground="{DynamicResource TextBrush}"/></TabItem.Header>
                 <Grid Margin="12">
                     <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
                     <Grid>
@@ -139,7 +139,7 @@
                 </Grid>
             </TabItem>
             <TabItem>
-                <TabItem.Header><TextBlock Text="Keyboard keys" Foreground="#111820"/></TabItem.Header>
+                <TabItem.Header><TextBlock Text="Keyboard keys" Foreground="{DynamicResource TextBrush}"/></TabItem.Header>
                 <Grid Margin="12">
                     <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
                     <Grid>
@@ -193,7 +193,7 @@
                 </Grid>
             </TabItem>
             <TabItem>
-                <TabItem.Header><TextBlock Text="Applications" Foreground="#111820"/></TabItem.Header>
+                <TabItem.Header><TextBlock Text="Applications" Foreground="{DynamicResource TextBrush}"/></TabItem.Header>
                 <Grid Margin="12">
                     <Grid x:Name="ApplicationsPanel">
                         <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
@@ -318,7 +318,7 @@
                 </Grid>
             </TabItem>
             <TabItem>
-                <TabItem.Header><TextBlock Text="Custom macro" Foreground="#111820"/></TabItem.Header>
+                <TabItem.Header><TextBlock Text="Custom macro" Foreground="{DynamicResource TextBrush}"/></TabItem.Header>
                 <Grid Margin="12">
                     <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
                     <StackPanel><TextBlock Text="MACRO NAME" Style="{StaticResource SmallMutedText}" FontWeight="Bold" Margin="0,0,0,5"/><TextBox x:Name="NameBox"/></StackPanel>
@@ -328,7 +328,7 @@
                     <TabControl Grid.Row="4" MinHeight="104" Background="{DynamicResource SurfaceAltBrush}"
                                 BorderBrush="{DynamicResource BorderBrush}">
                         <TabItem>
-                            <TabItem.Header><TextBlock Text="Keyboard, text &amp; timing" Foreground="#111820"/></TabItem.Header>
+                            <TabItem.Header><TextBlock Text="Keyboard, text &amp; timing" Foreground="{DynamicResource TextBrush}"/></TabItem.Header>
                             <Grid Margin="8">
                                 <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
                                 <Grid>
@@ -345,14 +345,14 @@
                             </Grid>
                         </TabItem>
                         <TabItem>
-                            <TabItem.Header><TextBlock Text="Mouse &amp; gamepad" Foreground="#111820"/></TabItem.Header>
+                            <TabItem.Header><TextBlock Text="Mouse &amp; gamepad" Foreground="{DynamicResource TextBrush}"/></TabItem.Header>
                             <WrapPanel Margin="10">
                                 <Button Content="Mouse button, movement, or scroll" Click="AddMouse_Click" Margin="0,0,8,0"/>
                                 <Button Content="Virtual gamepad" Click="AddGamepad_Click"/>
                             </WrapPanel>
                         </TabItem>
                         <TabItem>
-                            <TabItem.Header><TextBlock Text="Programs &amp; signals" Foreground="#111820"/></TabItem.Header>
+                            <TabItem.Header><TextBlock Text="Programs &amp; signals" Foreground="{DynamicResource TextBrush}"/></TabItem.Header>
                             <WrapPanel Margin="10">
                                 <Button Content="Launch program" Click="AddProgram_Click" Margin="0,0,8,0"/>
                                 <Button Content="Send MIDI" Click="AddMidi_Click" Margin="0,0,8,0"/>
