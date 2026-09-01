@@ -26,6 +26,15 @@ Tippy is a Windows 11 utility for people who want useful work and gameplay contr
 Each pedal has independent banks, realistic switch placement, live press illumination, reusable bank files, and drag-and-drop placement that can match the pedals on your floor.
 
 <details>
+<summary><strong>Use the dedicated compact tabbed mode</strong></summary>
+
+![Tippy compact tabbed pedal view](docs/images/tippy-compact-tabs.png)
+
+Tabbed mode shows one full-size pedal at a time and deliberately contracts the surrounding interface to a smaller footprint than normal one-pedal mode. Every tab retains its banks, bank tools, live illumination, and assignment buttons. Tabs and pedal handles remain draggable.
+
+</details>
+
+<details>
 <summary><strong>Browse application-specific shortcuts</strong></summary>
 
 ![Tippy Applications shortcut browser](docs/images/tippy-applications.png)
@@ -41,9 +50,12 @@ The searchable catalog currently includes 472 commands across 27 Windows applica
 - Save, load, and copy portable `.tippy-bank.json` banks to any pedal with enough switches—including loading the same bank on several pedals.
 - Assign Windows actions, individual keys, key combinations, text strings, timed recordings, delays, mouse actions, and optional Xbox 360 gamepad buttons.
 - Choose tap-once or hold-until-release behavior.
-- Arrange pedal cards automatically, stacked, or side by side; drag cards to match their physical order.
+- Arrange pedal cards automatically, stacked, side by side, or in a tile grid with automatic or 1–6-column placement.
+- Use a distinct compact tabbed mode to show one full-size pedal at a time without losing its controls.
+- Drag pedal cards or compact tabs to match their physical order.
 - See the pressed switch illuminate in real time.
 - Switch between dark and light themes.
+- Send Tippy to the system tray while its pedal assignments continue running.
 - Learn unknown USB HID pedals without a driver or code change.
 - Hot-plug devices without restarting Tippy.
 

@@ -13,7 +13,7 @@
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
-        <Border Grid.Row="0" Background="{DynamicResource SurfaceBrush}"
+        <Border x:Name="HeaderBorder" Grid.Row="0" Background="{DynamicResource SurfaceBrush}"
                 BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,0,0,1" Padding="24,18">
             <Grid>
                 <Grid.ColumnDefinitions>
@@ -23,29 +23,30 @@
                 </Grid.ColumnDefinitions>
                 <StackPanel Grid.Column="0">
                     <StackPanel Orientation="Horizontal">
-                        <Image Source="/Tippy;component/Assets/Branding/tippy-toes-t.png"
+                        <Image x:Name="HeaderMascot" Source="/Tippy;component/Assets/Branding/tippy-toes-t.png"
                                Width="58" Height="76" Margin="0,-14,10,-14"
                                Stretch="Uniform" SnapsToDevicePixels="True"
                                IsHitTestVisible="False"
                                AutomationProperties.Name="Tippy Toes mascot"/>
-                        <Image Source="/Tippy;component/Assets/Branding/tippy-tattoo-wordmark.png"
+                        <Image x:Name="HeaderWordmark" Source="/Tippy;component/Assets/Branding/tippy-tattoo-wordmark.png"
                                Width="96" Height="66" Stretch="Uniform" VerticalAlignment="Center"
                                SnapsToDevicePixels="True" IsHitTestVisible="False"
                                AutomationProperties.Name="TIPPY tattoo wordmark"/>
                     </StackPanel>
-                    <TextBlock Text="Foot control → fast macros" Style="{StaticResource SmallMutedText}" Margin="68,-5,0,0"/>
+                    <TextBlock x:Name="HeaderTagline" Text="Foot control → fast macros" Style="{StaticResource SmallMutedText}" Margin="68,-5,0,0"/>
                 </StackPanel>
                 <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
                     <Button Content="Open profile" Click="OpenProfile_Click" Margin="0,0,8,0"/>
                     <Button Content="Save as" Click="SaveProfile_Click" Margin="0,0,8,0"/>
                     <Button Content="Settings" Click="Settings_Click" Margin="0,0,8,0"/>
+                    <Button Content="To tray" Click="MinimizeToTray_Click" Margin="0,0,8,0" ToolTip="Keep Tippy running in the notification area"/>
                     <Button Content="Help" Click="Help_Click" Margin="0,0,8,0"/>
                     <Button x:Name="ThemeButton" Content="Light mode" Click="Theme_Click"/>
                 </StackPanel>
             </Grid>
         </Border>
 
-        <Border Grid.Row="1" Background="{DynamicResource SurfaceAltBrush}" Padding="24,13">
+        <Border x:Name="AllPedalsBorder" Grid.Row="1" Background="{DynamicResource SurfaceAltBrush}" Padding="24,13">
             <Grid>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto"/>
@@ -60,10 +61,10 @@
             </Grid>
         </Border>
 
-        <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"
+        <ScrollViewer x:Name="DevicesScrollViewer" Grid.Row="2" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"
                       Background="{DynamicResource BackgroundBrush}">
-            <StackPanel Margin="24,22,24,30">
-                <Grid Margin="0,0,0,14">
+            <StackPanel x:Name="DevicesContent" Margin="24,22,24,30">
+                <Grid x:Name="DevicesToolbar" Margin="0,0,0,14">
                     <StackPanel>
                         <TextBlock Text="Foot controls" FontSize="21" FontWeight="SemiBold"/>
                         <TextBlock Text="Press a pedal to run its assignment. Edit any tile to build the macro."
@@ -79,7 +80,24 @@
                             <ComboBoxItem Tag="Auto"><TextBlock Text="Auto" Foreground="#111820"/></ComboBoxItem>
                             <ComboBoxItem Tag="Stacked"><TextBlock Text="Stacked" Foreground="#111820"/></ComboBoxItem>
                             <ComboBoxItem Tag="SideBySide"><TextBlock Text="Side by side" Foreground="#111820"/></ComboBoxItem>
+                            <ComboBoxItem Tag="Tiled"><TextBlock Text="Tiles" Foreground="#111820"/></ComboBoxItem>
+                            <ComboBoxItem Tag="Tabbed"><TextBlock Text="Tabbed" Foreground="#111820"/></ComboBoxItem>
                         </ComboBox>
+                        <StackPanel x:Name="TileColumnsPanel" Orientation="Horizontal" Visibility="Collapsed" Margin="0,0,12,0">
+                            <TextBlock Text="Columns" Style="{StaticResource SmallMutedText}" VerticalAlignment="Center" Margin="0,0,7,0"/>
+                            <ComboBox x:Name="TileColumnsBox" Width="88" SelectionChanged="TileColumnsBox_SelectionChanged">
+                                <ComboBox.Resources>
+                                    <Style TargetType="TextBlock"><Setter Property="Foreground" Value="#111820"/></Style>
+                                </ComboBox.Resources>
+                                <ComboBoxItem Tag="0"><TextBlock Text="Auto" Foreground="#111820"/></ComboBoxItem>
+                                <ComboBoxItem Tag="1"><TextBlock Text="1" Foreground="#111820"/></ComboBoxItem>
+                                <ComboBoxItem Tag="2"><TextBlock Text="2" Foreground="#111820"/></ComboBoxItem>
+                                <ComboBoxItem Tag="3"><TextBlock Text="3" Foreground="#111820"/></ComboBoxItem>
+                                <ComboBoxItem Tag="4"><TextBlock Text="4" Foreground="#111820"/></ComboBoxItem>
+                                <ComboBoxItem Tag="5"><TextBlock Text="5" Foreground="#111820"/></ComboBoxItem>
+                                <ComboBoxItem Tag="6"><TextBlock Text="6" Foreground="#111820"/></ComboBoxItem>
+                            </ComboBox>
+                        </StackPanel>
                         <Button Content="Learn new pedal" Click="LearnPedal_Click" Margin="0,0,8,0"
                                 Background="{DynamicResource AccentSoftBrush}"/>
                         <Button Content="Scan USB" Click="Scan_Click"/>
@@ -97,7 +115,7 @@
             </StackPanel>
         </ScrollViewer>
 
-        <Border Grid.Row="3" Background="{DynamicResource SurfaceBrush}" BorderBrush="{DynamicResource BorderBrush}"
+        <Border x:Name="StatusBorder" Grid.Row="3" Background="{DynamicResource SurfaceBrush}" BorderBrush="{DynamicResource BorderBrush}"
                 BorderThickness="0,1,0,0" Padding="16,9">
             <Grid>
                 <Grid.ColumnDefinitions>

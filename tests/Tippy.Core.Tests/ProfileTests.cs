@@ -55,7 +55,7 @@ public sealed class ProfileTests
 
         var loaded = new ProfileSerializer().Deserialize(json);
 
-        Assert.Equal(3, loaded.SchemaVersion);
+        Assert.Equal(4, loaded.SchemaVersion);
         Assert.All(loaded.Devices, device => Assert.Equal(2, device.ActiveBankIndex));
     }
 
@@ -77,6 +77,24 @@ public sealed class ProfileTests
         Assert.Equal(AppTheme.Light, loaded.Theme);
         Assert.Equal("Copy", loaded.Devices[0].Banks[0].Bindings[0].Macro.Name);
         Assert.Equal(["Ctrl", "C"], loaded.Devices[0].Banks[0].Bindings[0].Macro.Steps[0].Keys);
+    }
+
+    [Fact]
+    public void ProfileRoundTripsTileAndTabbedLayoutPreferences()
+    {
+        var profile = new AppProfile
+        {
+            PedalLayout = PedalLayoutMode.Tiled,
+            TileColumns = 4,
+            SelectedTabbedDeviceKey = "right-pedal"
+        };
+
+        var serializer = new ProfileSerializer();
+        var loaded = serializer.Deserialize(serializer.Serialize(profile));
+
+        Assert.Equal(PedalLayoutMode.Tiled, loaded.PedalLayout);
+        Assert.Equal(4, loaded.TileColumns);
+        Assert.Equal("right-pedal", loaded.SelectedTabbedDeviceKey);
     }
 
     [Fact]
@@ -102,7 +120,7 @@ public sealed class ProfileTests
         var serializer = new ProfileSerializer();
         var loaded = serializer.Deserialize(serializer.Serialize(profile));
 
-        Assert.Equal(3, loaded.SchemaVersion);
+        Assert.Equal(4, loaded.SchemaVersion);
         var learned = Assert.Single(loaded.LearnedPedals);
         Assert.Equal("Custom pedal", learned.Name);
         Assert.Equal(3, learned.Switches.Count);

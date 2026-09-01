@@ -18,20 +18,25 @@ public partial class MainWindow : Window
     private readonly GlobalHotkeyService _hotkey = new();
     private readonly Dictionary<string, PedalDeviceInfo> _connected = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<(string DeviceKey, int SwitchIndex), Border> _switchTiles = new();
+    private readonly Dictionary<string, Border> _pedalTabHeaders = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<(string DeviceKey, int SwitchIndex), MacroDefinition> _activeHeldMacros = new();
     private readonly List<Button> _bankButtons = [];
     private AppProfile _profile = new();
     private CancellationTokenSource? _saveDebounce;
     private bool _loaded;
     private bool _updatingLayoutSelection;
-    private int _lastOptimizedPedalCount = -1;
+    private bool _buildingTabbedLayout;
+    private string _lastOptimizationKey = string.Empty;
     private bool? _lastAutoSideBySide;
     private Point _pedalDragStart;
     private string? _draggedPedalKey;
+    private System.Windows.Forms.NotifyIcon? _trayIcon;
+    private bool _trayTipShown;
 
     public MainWindow()
     {
         InitializeComponent();
+        InitializeTrayIcon();
         _macroPlayer = new MacroPlayer(new WindowsInputService(), _gamepad);
         Loaded += MainWindow_Loaded;
         Closed += MainWindow_Closed;
@@ -108,6 +113,12 @@ public partial class MainWindow : Window
                 tile.BorderBrush = e.IsPressed ? new SolidColorBrush(Color.FromRgb(86, 220, 255)) : Brushes.Transparent;
                 tile.RenderTransform = e.IsPressed ? new ScaleTransform(0.985, 0.985) : Transform.Identity;
                 tile.RenderTransformOrigin = new Point(0.5, 0.5);
+            }
+            if (_pedalTabHeaders.TryGetValue(e.Device.DeviceKey, out var tabHeader))
+            {
+                tabHeader.Background = e.IsPressed
+                    ? (Brush)FindResource("AccentSoftBrush")
+                    : Brushes.Transparent;
             }
 
             if (!e.IsPressed)
@@ -201,42 +212,129 @@ public partial class MainWindow : Window
         DevicesPanel.RowDefinitions.Clear();
         DevicesPanel.ColumnDefinitions.Clear();
         _switchTiles.Clear();
+        _pedalTabHeaders.Clear();
         EmptyState.Visibility = _profile.Devices.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
-        var sideBySide = ShouldUseSideBySide();
-        _lastAutoSideBySide = sideBySide;
         var count = _profile.Devices.Count;
-        if (sideBySide)
+
+        ApplyLayoutChrome();
+        if (_profile.PedalLayout == PedalLayoutMode.Tabbed && count > 0)
         {
-            for (var index = 0; index < Math.Max(1, count); index++)
-                DevicesPanel.ColumnDefinitions.Add(new ColumnDefinition());
+            BuildTabbedDeviceLayout();
         }
         else
         {
-            for (var index = 0; index < Math.Max(1, count); index++)
-                DevicesPanel.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            BuildGridDeviceLayout();
         }
-        for (var index = 0; index < count; index++)
-        {
-            var device = _profile.Devices[index];
-            device.Normalize();
-            var card = CreateDeviceCard(device, _connected.ContainsKey(device.DeviceKey));
-            card.Margin = sideBySide
-                ? new Thickness(index == 0 ? 0 : 7, 0, index == count - 1 ? 0 : 7, 14)
-                : new Thickness(0, 0, 0, 14);
-            if (sideBySide) Grid.SetColumn(card, index); else Grid.SetRow(card, index);
-            DevicesPanel.Children.Add(card);
-        }
+
         StatusDot.Fill = (Brush)FindResource(_connected.Count > 0 ? "SuccessBrush" : "MutedTextBrush");
         if (optimizeWindow) OptimizeWindowForPedals();
     }
 
-    private Border CreateDeviceCard(PedalDeviceProfile device, bool connected)
+    private void BuildGridDeviceLayout()
+    {
+        var count = _profile.Devices.Count;
+        var columns = GetGridColumnCount(count);
+        var rows = Math.Max(1, (int)Math.Ceiling(count / (double)columns));
+        _lastAutoSideBySide = columns > 1;
+        for (var column = 0; column < columns; column++)
+            DevicesPanel.ColumnDefinitions.Add(new ColumnDefinition());
+        for (var row = 0; row < rows; row++)
+            DevicesPanel.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+
+        for (var index = 0; index < count; index++)
+        {
+            var device = _profile.Devices[index];
+            device.Normalize();
+            var row = index / columns;
+            var column = index % columns;
+            var card = CreateDeviceCard(device, _connected.ContainsKey(device.DeviceKey), false);
+            card.Margin = new Thickness(
+                column == 0 ? 0 : 7,
+                row == 0 ? 0 : 7,
+                column == columns - 1 || index == count - 1 ? 0 : 7,
+                row == rows - 1 ? 14 : 7);
+            Grid.SetRow(card, row);
+            Grid.SetColumn(card, column);
+            DevicesPanel.Children.Add(card);
+        }
+    }
+
+    private void BuildTabbedDeviceLayout()
+    {
+        _buildingTabbedLayout = true;
+        var tabs = new TabControl
+        {
+            Background = Brushes.Transparent,
+            BorderBrush = (Brush)FindResource("BorderBrush"),
+            Margin = new Thickness(0, 0, 0, 8)
+        };
+        tabs.SelectionChanged += TabbedDevices_SelectionChanged;
+
+        foreach (var device in _profile.Devices)
+        {
+            device.Normalize();
+            var connected = _connected.ContainsKey(device.DeviceKey);
+            var header = CreatePedalTabHeader(device, connected);
+            var tab = new TabItem
+            {
+                Header = header,
+                Content = CreateDeviceCard(device, connected, true),
+                Tag = device.DeviceKey,
+                AllowDrop = true
+            };
+            tab.DragOver += (_, args) => PedalTab_DragOver(header, device.DeviceKey, args);
+            tab.DragLeave += (_, _) => ResetPedalTabHeader(header);
+            tab.Drop += (_, args) => PedalTab_Drop(header, device.DeviceKey, args);
+            tabs.Items.Add(tab);
+        }
+
+        var selectedIndex = _profile.Devices.FindIndex(device =>
+            device.DeviceKey.Equals(_profile.SelectedTabbedDeviceKey, StringComparison.OrdinalIgnoreCase));
+        if (selectedIndex < 0)
+            selectedIndex = _profile.Devices.FindIndex(device => _connected.ContainsKey(device.DeviceKey));
+        tabs.SelectedIndex = Math.Max(0, selectedIndex);
+        if (tabs.SelectedItem is TabItem selected && selected.Tag is string key)
+            _profile.SelectedTabbedDeviceKey = key;
+        _buildingTabbedLayout = false;
+        DevicesPanel.Children.Add(tabs);
+    }
+
+    private Border CreatePedalTabHeader(PedalDeviceProfile device, bool connected)
+    {
+        var text = new TextBlock
+        {
+            Text = $"{(connected ? "●" : "○")}  {device.DisplayName}",
+            Foreground = new SolidColorBrush(connected
+                ? Color.FromRgb(17, 24, 32)
+                : Color.FromRgb(82, 94, 108)),
+            FontWeight = FontWeights.SemiBold
+        };
+        var header = new Border
+        {
+            Tag = device.DeviceKey,
+            Background = Brushes.Transparent,
+            BorderBrush = Brushes.Transparent,
+            BorderThickness = new Thickness(1),
+            CornerRadius = new CornerRadius(6),
+            Padding = new Thickness(10, 5, 10, 5),
+            Cursor = System.Windows.Input.Cursors.Hand,
+            ToolTip = "Select this pedal, or drag to reorder it",
+            Child = text
+        };
+        header.PreviewMouseLeftButtonDown += PedalHandle_PreviewMouseLeftButtonDown;
+        header.PreviewMouseMove += PedalHandle_PreviewMouseMove;
+        _pedalTabHeaders[device.DeviceKey] = header;
+        return header;
+    }
+
+    private Border CreateDeviceCard(PedalDeviceProfile device, bool connected, bool compact)
     {
         var shell = new Border
         {
             Background = (Brush)FindResource("SurfaceBrush"), BorderBrush = (Brush)FindResource("BorderBrush"),
-            BorderThickness = new Thickness(1), CornerRadius = new CornerRadius(11), Padding = new Thickness(18),
-            Margin = new Thickness(0), AllowDrop = true
+            BorderThickness = new Thickness(1), CornerRadius = new CornerRadius(11),
+            Padding = compact ? new Thickness(10) : new Thickness(18),
+            Margin = compact ? new Thickness(6) : new Thickness(0), AllowDrop = true
         };
         shell.DragOver += (_, args) => PedalCard_DragOver(shell, device.DeviceKey, args);
         shell.DragLeave += (_, _) =>
@@ -247,7 +345,7 @@ public partial class MainWindow : Window
         shell.Drop += (_, args) => PedalCard_Drop(shell, device.DeviceKey, args);
         var stack = new StackPanel();
         shell.Child = stack;
-        var header = new Grid { Margin = new Thickness(0, 0, 0, 14) };
+        var header = new Grid { Margin = new Thickness(0, 0, 0, compact ? 8 : 14) };
         header.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         header.ColumnDefinitions.Add(new ColumnDefinition());
         header.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
@@ -289,19 +387,19 @@ public partial class MainWindow : Window
         Grid.SetColumn(badge, 2);
         header.Children.Add(badge);
         stack.Children.Add(header);
-        stack.Children.Add(CreateDeviceBankBar(device));
+        stack.Children.Add(CreateDeviceBankBar(device, compact));
         stack.Children.Add(CreatePedalVisual(device, connected));
         return shell;
     }
 
-    private FrameworkElement CreateDeviceBankBar(PedalDeviceProfile device)
+    private FrameworkElement CreateDeviceBankBar(PedalDeviceProfile device, bool compact)
     {
         var bar = new Border
         {
             Background = (Brush)FindResource("SurfaceAltBrush"),
             BorderBrush = (Brush)FindResource("BorderBrush"), BorderThickness = new Thickness(1),
             CornerRadius = new CornerRadius(8), Padding = new Thickness(9, 7, 9, 7),
-            Margin = new Thickness(0, 0, 0, 10)
+            Margin = new Thickness(0, 0, 0, compact ? 6 : 10)
         };
         var grid = new Grid();
         grid.ColumnDefinitions.Add(new ColumnDefinition());
@@ -472,27 +570,65 @@ public partial class MainWindow : Window
         if (e.Data.GetData("TippyPedalDeviceKey") is not string sourceKey ||
             sourceKey.Equals(targetKey, StringComparison.OrdinalIgnoreCase))
             return;
+        var sourceIndexBeforeMove = _profile.Devices.FindIndex(device =>
+            device.DeviceKey.Equals(sourceKey, StringComparison.OrdinalIgnoreCase));
+        var targetIndexBeforeMove = _profile.Devices.FindIndex(device =>
+            device.DeviceKey.Equals(targetKey, StringComparison.OrdinalIgnoreCase));
+        if (sourceIndexBeforeMove < 0 || targetIndexBeforeMove < 0) return;
+        var position = e.GetPosition(card);
+        var insertAfter = _profile.Devices.Count == 2
+            ? sourceIndexBeforeMove < targetIndexBeforeMove
+            : GetGridColumnCount(_profile.Devices.Count) > 1
+                ? position.X >= card.ActualWidth / 2
+                : position.Y >= card.ActualHeight / 2;
+        MovePedal(sourceKey, targetKey, insertAfter);
+        e.Handled = true;
+    }
+
+    private void PedalTab_DragOver(Border header, string targetKey, DragEventArgs e)
+    {
+        if (!e.Data.GetDataPresent("TippyPedalDeviceKey") ||
+            e.Data.GetData("TippyPedalDeviceKey") is not string sourceKey ||
+            sourceKey.Equals(targetKey, StringComparison.OrdinalIgnoreCase))
+        {
+            e.Effects = DragDropEffects.None;
+            return;
+        }
+        e.Effects = DragDropEffects.Move;
+        header.BorderBrush = (Brush)FindResource("AccentBrush");
+        e.Handled = true;
+    }
+
+    private void PedalTab_Drop(Border header, string targetKey, DragEventArgs e)
+    {
+        ResetPedalTabHeader(header);
+        if (e.Data.GetData("TippyPedalDeviceKey") is not string sourceKey ||
+            sourceKey.Equals(targetKey, StringComparison.OrdinalIgnoreCase))
+            return;
+        var position = e.GetPosition(header);
+        MovePedal(sourceKey, targetKey, position.X >= header.ActualWidth / 2);
+        e.Handled = true;
+    }
+
+    private void ResetPedalTabHeader(Border header)
+    {
+        header.BorderBrush = Brushes.Transparent;
+        header.BorderThickness = new Thickness(1);
+    }
+
+    private void MovePedal(string sourceKey, string targetKey, bool insertAfter)
+    {
         var source = _profile.Devices.FirstOrDefault(device =>
             device.DeviceKey.Equals(sourceKey, StringComparison.OrdinalIgnoreCase));
         var target = _profile.Devices.FirstOrDefault(device =>
             device.DeviceKey.Equals(targetKey, StringComparison.OrdinalIgnoreCase));
         if (source is null || target is null) return;
-
-        var sourceIndexBeforeMove = _profile.Devices.IndexOf(source);
-        var targetIndexBeforeMove = _profile.Devices.IndexOf(target);
-        var position = e.GetPosition(card);
-        var insertAfter = _profile.Devices.Count == 2
-            ? sourceIndexBeforeMove < targetIndexBeforeMove
-            : ShouldUseSideBySide()
-                ? position.X >= card.ActualWidth / 2
-                : position.Y >= card.ActualHeight / 2;
         _profile.Devices.Remove(source);
         var targetIndex = _profile.Devices.IndexOf(target);
         _profile.Devices.Insert(Math.Clamp(targetIndex + (insertAfter ? 1 : 0), 0, _profile.Devices.Count), source);
         RefreshDevices();
         ScheduleSave();
         SetStatus($"Moved {source.DisplayName} {(insertAfter ? "after" : "before")} {target.DisplayName}");
-        e.Handled = true;
     }
 
     private FrameworkElement CreatePedalVisual(PedalDeviceProfile device, bool connected)
@@ -533,7 +669,9 @@ public partial class MainWindow : Window
         {
             Stretch = Stretch.Uniform,
             StretchDirection = StretchDirection.DownOnly,
-            MaxHeight = ShouldUseSideBySide() ? 325 : 440,
+            MaxHeight = _profile.PedalLayout == PedalLayoutMode.Tabbed
+                ? 485
+                : ShouldUseSideBySide() ? 325 : 440,
             HorizontalAlignment = HorizontalAlignment.Stretch,
             Child = canvas
         };
@@ -655,16 +793,78 @@ public partial class MainWindow : Window
         new AboutWindow { Owner = this }.ShowDialog();
     }
 
+    private void InitializeTrayIcon()
+    {
+        var menu = new System.Windows.Forms.ContextMenuStrip();
+        menu.Items.Add("Show Tippy", null, (_, _) => Dispatcher.Invoke(RestoreFromTray));
+        menu.Items.Add(new System.Windows.Forms.ToolStripSeparator());
+        menu.Items.Add("Exit", null, (_, _) => Dispatcher.Invoke(Close));
+        _trayIcon = new System.Windows.Forms.NotifyIcon
+        {
+            Text = "Tippy — Foot Control Macros",
+            Icon = System.Drawing.Icon.ExtractAssociatedIcon(Environment.ProcessPath ?? string.Empty),
+            ContextMenuStrip = menu,
+            Visible = false
+        };
+        _trayIcon.MouseClick += (_, args) =>
+        {
+            if (args.Button == System.Windows.Forms.MouseButtons.Left)
+                Dispatcher.Invoke(RestoreFromTray);
+        };
+        _trayIcon.DoubleClick += (_, _) => Dispatcher.Invoke(RestoreFromTray);
+    }
+
+    private void MinimizeToTray_Click(object sender, RoutedEventArgs e) => HideToTray();
+
+    private void HideToTray()
+    {
+        if (_trayIcon is null) return;
+        _trayIcon.Visible = true;
+        Hide();
+        if (!_trayTipShown)
+        {
+            _trayIcon.ShowBalloonTip(2500, "Tippy is still running",
+                "Double-click the tray icon to restore Tippy. Your pedals remain active.",
+                System.Windows.Forms.ToolTipIcon.Info);
+            _trayTipShown = true;
+        }
+    }
+
+    private void RestoreFromTray()
+    {
+        if (_trayIcon is not null) _trayIcon.Visible = false;
+        Show();
+        WindowState = WindowState.Normal;
+        Activate();
+        Topmost = true;
+        Topmost = false;
+        Focus();
+    }
+
     private void DeviceLayoutBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
         if (!_loaded || _updatingLayoutSelection) return;
         if (!Enum.TryParse<PedalLayoutMode>((DeviceLayoutBox.SelectedItem as ComboBoxItem)?.Tag?.ToString(), out var mode))
             mode = PedalLayoutMode.Auto;
         _profile.PedalLayout = mode;
-        _lastOptimizedPedalCount = -1;
+        _lastOptimizationKey = string.Empty;
         RefreshDevices(true);
         ScheduleSave();
         SetStatus($"Pedal layout: {(mode == PedalLayoutMode.SideBySide ? "side by side" : mode.ToString().ToLowerInvariant())}");
+    }
+
+    private void TileColumnsBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (!_loaded || _updatingLayoutSelection) return;
+        _profile.TileColumns = int.TryParse((TileColumnsBox.SelectedItem as ComboBoxItem)?.Tag?.ToString(), out var columns)
+            ? Math.Clamp(columns, 0, 6)
+            : 0;
+        _lastOptimizationKey = string.Empty;
+        RefreshDevices(true);
+        ScheduleSave();
+        SetStatus(_profile.TileColumns == 0
+            ? "Tile columns: automatic"
+            : $"Tile columns: {_profile.TileColumns}");
     }
 
     private void SetLayoutSelector()
@@ -674,8 +874,14 @@ public partial class MainWindow : Window
         {
             PedalLayoutMode.Stacked => 1,
             PedalLayoutMode.SideBySide => 2,
+            PedalLayoutMode.Tiled => 3,
+            PedalLayoutMode.Tabbed => 4,
             _ => 0
         };
+        TileColumnsBox.SelectedIndex = Math.Clamp(_profile.TileColumns, 0, 6);
+        TileColumnsPanel.Visibility = _profile.PedalLayout == PedalLayoutMode.Tiled
+            ? Visibility.Visible
+            : Visibility.Collapsed;
         _updatingLayoutSelection = false;
     }
 
@@ -683,7 +889,59 @@ public partial class MainWindow : Window
     {
         if (_profile.PedalLayout == PedalLayoutMode.Stacked) return false;
         if (_profile.PedalLayout == PedalLayoutMode.SideBySide) return true;
+        if (_profile.PedalLayout == PedalLayoutMode.Tiled)
+            return GetGridColumnCount(_profile.Devices.Count) > 1;
+        if (_profile.PedalLayout == PedalLayoutMode.Tabbed) return false;
         return _profile.Devices.Count > 1 && ActualWidth >= 1220;
+    }
+
+    private int GetGridColumnCount(int count)
+    {
+        count = Math.Max(1, count);
+        return _profile.PedalLayout switch
+        {
+            PedalLayoutMode.Stacked => 1,
+            PedalLayoutMode.SideBySide => count,
+            PedalLayoutMode.Tabbed => 1,
+            PedalLayoutMode.Tiled when _profile.TileColumns > 0 => Math.Min(_profile.TileColumns, count),
+            PedalLayoutMode.Tiled => Math.Min(count, Math.Max(1, (int)Math.Ceiling(Math.Sqrt(count)))),
+            _ => count > 1 && ActualWidth >= 1220 ? count : 1
+        };
+    }
+
+    private void TabbedDevices_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (_buildingTabbedLayout || sender is not TabControl tabs ||
+            tabs.SelectedItem is not TabItem selected || selected.Tag is not string deviceKey)
+            return;
+        _profile.SelectedTabbedDeviceKey = deviceKey;
+        ScheduleSave();
+        var device = _profile.Devices.FirstOrDefault(item =>
+            item.DeviceKey.Equals(deviceKey, StringComparison.OrdinalIgnoreCase));
+        if (device is not null) SetStatus($"Showing {device.DisplayName}");
+    }
+
+    private void ApplyLayoutChrome()
+    {
+        var compact = _profile.PedalLayout == PedalLayoutMode.Tabbed;
+        MinWidth = compact ? 880 : 920;
+        MinHeight = compact ? 760 : 650;
+        HeaderBorder.Padding = compact ? new Thickness(12, 8, 12, 8) : new Thickness(24, 18, 24, 18);
+        HeaderMascot.Width = compact ? 44 : 58;
+        HeaderMascot.Height = compact ? 58 : 76;
+        HeaderMascot.Margin = compact ? new Thickness(0, -8, 8, -8) : new Thickness(0, -14, 10, -14);
+        HeaderWordmark.Width = compact ? 78 : 96;
+        HeaderWordmark.Height = compact ? 52 : 66;
+        HeaderTagline.Visibility = compact ? Visibility.Collapsed : Visibility.Visible;
+        AllPedalsBorder.Padding = compact ? new Thickness(12, 8, 12, 8) : new Thickness(24, 13, 24, 13);
+        DevicesContent.Margin = compact ? new Thickness(12, 10, 12, 12) : new Thickness(24, 22, 24, 30);
+        DevicesToolbar.Margin = compact ? new Thickness(0, 0, 0, 8) : new Thickness(0, 0, 0, 14);
+        StatusBorder.Padding = compact ? new Thickness(10, 6, 10, 6) : new Thickness(16, 9, 16, 9);
+        foreach (var button in _bankButtons)
+            button.Padding = compact ? new Thickness(12, 6, 12, 6) : new Thickness(18, 9, 18, 9);
+        TileColumnsPanel.Visibility = _profile.PedalLayout == PedalLayoutMode.Tiled
+            ? Visibility.Visible
+            : Visibility.Collapsed;
     }
 
     private void MainWindow_SizeChanged(object sender, SizeChangedEventArgs e)
@@ -697,25 +955,41 @@ public partial class MainWindow : Window
     private void OptimizeWindowForPedals()
     {
         if (WindowState != WindowState.Normal) return;
-        var count = _connected.Count;
-        if (count == 0) count = Math.Min(1, _profile.Devices.Count);
-        if (count == _lastOptimizedPedalCount) return;
-        _lastOptimizedPedalCount = count;
+        var count = Math.Max(1, _profile.Devices.Count);
+        var optimizationKey = $"{count}:{_profile.PedalLayout}:{_profile.TileColumns}";
+        if (optimizationKey == _lastOptimizationKey) return;
+        _lastOptimizationKey = optimizationKey;
         var work = SystemParameters.WorkArea;
+        if (_profile.PedalLayout == PedalLayoutMode.Tabbed)
+        {
+            Width = Math.Min(880, work.Width - 32);
+            Height = Math.Min(885, work.Height - 32);
+            Left = Math.Max(work.Left + 16, Math.Min(Left, work.Right - Width - 16));
+            Top = Math.Max(work.Top + 16, Math.Min(Top, work.Bottom - Height - 16));
+            return;
+        }
+
+        var columns = GetGridColumnCount(count);
+        var rows = (int)Math.Ceiling(count / (double)columns);
         var sideBySide = _profile.PedalLayout switch
         {
             PedalLayoutMode.Stacked => false,
             PedalLayoutMode.SideBySide => true,
+            PedalLayoutMode.Tiled => columns > 1,
             _ => count > 1 && work.Width >= 1320
         };
-        var desiredWidth = count switch
+        var desiredWidth = _profile.PedalLayout == PedalLayoutMode.Tiled
+            ? columns switch { 1 => 1050, 2 => 1510, _ => 1680 }
+            : count switch
         {
             <= 1 => 1050,
             2 when sideBySide => 1510,
             2 => 1200,
             _ => sideBySide ? 1680 : 1240
         };
-        var desiredHeight = count switch
+        var desiredHeight = _profile.PedalLayout == PedalLayoutMode.Tiled
+            ? rows switch { <= 1 => 780, 2 => 980, _ => 1040 }
+            : count switch
         {
             <= 1 => 735,
             2 when sideBySide => 770,
@@ -804,6 +1078,12 @@ public partial class MainWindow : Window
     {
         _saveDebounce?.Cancel();
         try { _profileStore.SaveDefaultAsync(_profile).GetAwaiter().GetResult(); } catch { }
+        if (_trayIcon is not null)
+        {
+            _trayIcon.Visible = false;
+            _trayIcon.Dispose();
+            _trayIcon = null;
+        }
         _hotkey.Dispose(); _hid.Dispose(); _macroPlayer.Dispose(); _gamepad.Dispose(); _saveDebounce?.Dispose();
     }
 
