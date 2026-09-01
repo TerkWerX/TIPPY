@@ -35,6 +35,7 @@ public partial class MainWindow : Window
     private readonly PedalPatternEngine _patternEngine = new();
     private readonly PedalActivityHub _pedalActivity = new();
     private readonly PedalRegistryService _pedalRegistry = new();
+    private readonly WindowPlacementService _windowPlacement = new();
     private readonly Dictionary<string, PedalDeviceInfo> _connected = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<(string DeviceKey, int SwitchIndex), Border> _switchTiles = new();
     private readonly Dictionary<string, Border> _pedalTabHeaders = new(StringComparer.OrdinalIgnoreCase);
@@ -62,17 +63,33 @@ public partial class MainWindow : Window
     private PedalDiagnosticsWindow? _diagnosticsWindow;
     private StatusOverlayWindow? _overlayWindow;
     private bool _rehearsalMode;
+    private string? _startupProfileError;
+    private WindowState _windowStateBeforeTray = WindowState.Normal;
+    private bool _restoreMaximizedOnLoad;
 
     public MainWindow()
     {
         InitializeComponent();
+        try
+        {
+            _profile = _profileStore.LoadDefaultAsync().GetAwaiter().GetResult();
+        }
+        catch (Exception exception)
+        {
+            _profile = new AppProfile();
+            _startupProfileError = exception.Message;
+        }
+        _profile.Normalize();
+        _restoreMaximizedOnLoad = _profile.WindowPlacement.IsMaximized;
         InitializeTrayIcon();
         _macroPlayer = new MacroPlayer(new WindowsInputService(), _gamepad);
         _gestureEngine.Invoked += GestureEngine_Invoked;
         Loaded += MainWindow_Loaded;
         Closed += MainWindow_Closed;
         SizeChanged += MainWindow_SizeChanged;
-        SourceInitialized += (_, _) => InitializePlatformInput();
+        LocationChanged += MainWindow_LocationChanged;
+        StateChanged += MainWindow_StateChanged;
+        SourceInitialized += MainWindow_SourceInitialized;
         _hid.ConnectionChanged += Hid_ConnectionChanged;
         _hid.StateChanged += Hid_StateChanged;
         _hid.ScanCompleted += Hid_ScanCompleted;
@@ -84,20 +101,14 @@ public partial class MainWindow : Window
         SystemEvents.PowerModeChanged += SystemEvents_PowerModeChanged;
     }
 
-    private async void MainWindow_Loaded(object sender, RoutedEventArgs e)
+    private void MainWindow_Loaded(object sender, RoutedEventArgs e)
     {
-        try
+        if (_startupProfileError is not null)
         {
-            _profile = await _profileStore.LoadDefaultAsync();
-        }
-        catch (Exception exception)
-        {
-            _profile = new AppProfile();
-            MessageBox.Show(this, $"The default profile could not be loaded. A fresh profile is active.\n\n{exception.Message}",
+            MessageBox.Show(this, $"The default profile could not be loaded. A fresh profile is active.\n\n{_startupProfileError}",
                 "Tippy profile", MessageBoxButton.OK, MessageBoxImage.Warning);
         }
 
-        _profile.Normalize();
         _macroPlayer.ConfigureSafety(_profile.Safety);
         _gestureEngine.ConfigureMaximumRepeatDuration(TimeSpan.FromSeconds(_profile.Safety.MaximumRepeatSeconds));
         _patternEngine.Configure(_profile.PedalPatterns);
@@ -105,6 +116,14 @@ public partial class MainWindow : Window
         ThemeService.Apply(_profile.Theme);
         SetLayoutSelector();
         _loaded = true;
+        if (_restoreMaximizedOnLoad)
+        {
+            WindowState = WindowState.Maximized;
+            _windowStateBeforeTray = WindowState.Maximized;
+        }
+        if (_profile.WindowPlacement.HasPlacement)
+            _lastOptimizationKey = GetWindowOptimizationKey();
+        RememberWindowPlacement();
         ScheduleSave();
         BuildBankButtons();
         RefreshDevices();
@@ -1314,6 +1333,14 @@ public partial class MainWindow : Window
         catch (Exception exception) { SetStatus($"Raw Input unavailable: {exception.Message}", true); }
     }
 
+    private void MainWindow_SourceInitialized(object? sender, EventArgs e)
+    {
+        ApplyLayoutChrome();
+        _windowPlacement.Restore(this, _profile.WindowPlacement);
+        _windowStateBeforeTray = WindowState == WindowState.Maximized ? WindowState.Maximized : WindowState.Normal;
+        InitializePlatformInput();
+    }
+
     private void SyncRawInputDevices()
     {
         if (!_loaded) return;
@@ -1519,6 +1546,9 @@ public partial class MainWindow : Window
     private void HideToTray()
     {
         if (_trayIcon is null) return;
+        if (WindowState != WindowState.Minimized)
+            _windowStateBeforeTray = WindowState == WindowState.Maximized ? WindowState.Maximized : WindowState.Normal;
+        RememberWindowPlacement();
         _trayIcon.Visible = true;
         Hide();
         if (!_trayTipShown)
@@ -1534,7 +1564,7 @@ public partial class MainWindow : Window
     {
         if (_trayIcon is not null) _trayIcon.Visible = false;
         Show();
-        WindowState = WindowState.Normal;
+        WindowState = _windowStateBeforeTray;
         Activate();
         Topmost = true;
         Topmost = false;
@@ -1646,26 +1676,45 @@ public partial class MainWindow : Window
 
     private void MainWindow_SizeChanged(object sender, SizeChangedEventArgs e)
     {
-        if (!_loaded || _profile.PedalLayout != PedalLayoutMode.Auto) return;
+        if (!_loaded) return;
+        RememberWindowPlacement();
+        if (_profile.PedalLayout != PedalLayoutMode.Auto) return;
         var next = ShouldUseSideBySide();
         if (_lastAutoSideBySide.HasValue && next != _lastAutoSideBySide.Value)
             RefreshDevices();
+    }
+
+    private void MainWindow_LocationChanged(object? sender, EventArgs e)
+    {
+        if (_loaded) RememberWindowPlacement();
+    }
+
+    private void MainWindow_StateChanged(object? sender, EventArgs e)
+    {
+        if (!_loaded) return;
+        if (WindowState != WindowState.Minimized)
+            _windowStateBeforeTray = WindowState == WindowState.Maximized ? WindowState.Maximized : WindowState.Normal;
+        RememberWindowPlacement();
+    }
+
+    private void RememberWindowPlacement()
+    {
+        if (!_loaded) return;
+        _windowPlacement.Capture(this, _profile.WindowPlacement);
+        ScheduleSave();
     }
 
     private void OptimizeWindowForPedals()
     {
         if (WindowState != WindowState.Normal) return;
         var count = Math.Max(1, _profile.Devices.Count);
-        var optimizationKey = $"{count}:{_profile.PedalLayout}:{_profile.TileColumns}";
+        var optimizationKey = GetWindowOptimizationKey();
         if (optimizationKey == _lastOptimizationKey) return;
         _lastOptimizationKey = optimizationKey;
-        var work = SystemParameters.WorkArea;
         if (_profile.PedalLayout == PedalLayoutMode.Tabbed)
         {
-            Width = Math.Min(880, work.Width - 32);
-            Height = Math.Min(885, work.Height - 32);
-            Left = Math.Max(work.Left + 16, Math.Min(Left, work.Right - Width - 16));
-            Top = Math.Max(work.Top + 16, Math.Min(Top, work.Bottom - Height - 16));
+            _windowPlacement.ResizeWithinCurrentMonitor(this, 880, 885, 16);
+            RememberWindowPlacement();
             return;
         }
 
@@ -1676,7 +1725,7 @@ public partial class MainWindow : Window
             PedalLayoutMode.Stacked => false,
             PedalLayoutMode.SideBySide => true,
             PedalLayoutMode.Tiled => columns > 1,
-            _ => count > 1 && work.Width >= 1320
+            _ => count > 1 && ActualWidth >= 1220
         };
         var desiredWidth = _profile.PedalLayout == PedalLayoutMode.Tiled
             ? columns switch { 1 => 1050, 2 => 1510, _ => 1680 }
@@ -1696,11 +1745,12 @@ public partial class MainWindow : Window
             2 => 980,
             _ => sideBySide ? 830 : 1040
         };
-        Width = Math.Min(desiredWidth, work.Width - 32);
-        Height = Math.Min(desiredHeight, work.Height - 32);
-        Left = Math.Max(work.Left + 16, Math.Min(Left, work.Right - Width - 16));
-        Top = Math.Max(work.Top + 16, Math.Min(Top, work.Bottom - Height - 16));
+        _windowPlacement.ResizeWithinCurrentMonitor(this, desiredWidth, desiredHeight, 16);
+        RememberWindowPlacement();
     }
+
+    private string GetWindowOptimizationKey() =>
+        $"{Math.Max(1, _profile.Devices.Count)}:{_profile.PedalLayout}:{_profile.TileColumns}";
 
     private void Theme_Click(object sender, RoutedEventArgs e)
     {
@@ -1792,6 +1842,7 @@ public partial class MainWindow : Window
     {
         SystemEvents.SessionSwitch -= SystemEvents_SessionSwitch;
         SystemEvents.PowerModeChanged -= SystemEvents_PowerModeChanged;
+        _windowPlacement.Capture(this, _profile.WindowPlacement);
         _saveDebounce?.Cancel();
         try { _profileStore.SaveDefaultAsync(_profile).GetAwaiter().GetResult(); } catch { }
         if (_trayIcon is not null)

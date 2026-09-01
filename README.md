@@ -61,6 +61,7 @@ The searchable catalog currently includes 557 commands across 32 Windows applica
 - Arrange pedal cards automatically, stacked, side by side, or in a tile grid with automatic or 1–6-column placement.
 - Use a distinct compact tabbed mode to show one full-size pedal at a time without losing its controls.
 - Drag pedal cards or compact tabs to match their physical order.
+- Reopen on the same monitor at the previous position and size; layout changes stay anchored to that monitor instead of recentering.
 - See the pressed switch illuminate in real time.
 - Switch between dark and light themes.
 - Send Tippy to the system tray while its pedal assignments continue running.

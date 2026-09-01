@@ -6,6 +6,8 @@ Notable changes to Tippy are documented here.
 
 ### Added
 
+- Persistent main-window monitor, position, normal size, maximized state, pedal layout, tile columns, and selected compact pedal tab.
+
 - Adjustable per-switch double-tap, long-press, repeat-while-held, and toggle behaviors with explicit conflict validation.
 - Cross-device pedal combinations and ordered sequences, including live pattern capture from physical foot presses.
 - Continuous mouse movement, horizontal/vertical scrolling, held mouse buttons, MIDI note/CC/program output, and OSC messages.
@@ -37,6 +39,11 @@ Notable changes to Tippy are documented here.
 - Drag reordering through pedal cards and compact tab headers.
 - **To tray** command with notification-area restore and exit controls; pedal input remains active while hidden.
 - Added OBS Studio, Streamlabs Desktop, vMix, XSplit Broadcaster, and Wirecast paired bindings for scene/camera switching and live-production controls.
+
+### Fixed
+
+- Layout changes now resize inside the window's current monitor and preserve its top-left position whenever physically possible instead of using the primary monitor's work area.
+- Restoring from the notification area now preserves a maximized window instead of always forcing normal state.
 
 ## [0.3.0] - 2026-09-01
 

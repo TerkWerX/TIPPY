@@ -64,7 +64,7 @@ public sealed class ProfileTests
 
         var loaded = new ProfileSerializer().Deserialize(json);
 
-        Assert.Equal(6, loaded.SchemaVersion);
+        Assert.Equal(7, loaded.SchemaVersion);
         Assert.All(loaded.Devices, device => Assert.Equal(2, device.ActiveBankIndex));
     }
 
@@ -131,6 +131,34 @@ public sealed class ProfileTests
     }
 
     [Fact]
+    public void ProfileRoundTripsWindowPlacementAndMaximizedState()
+    {
+        var profile = new AppProfile
+        {
+            PedalLayout = PedalLayoutMode.Tabbed,
+            WindowPlacement = new WindowPlacementSettings
+            {
+                HasPlacement = true,
+                Left = -1420,
+                Top = 84,
+                Width = 1180,
+                Height = 820,
+                IsMaximized = true
+            }
+        };
+
+        var loaded = new ProfileSerializer().Deserialize(new ProfileSerializer().Serialize(profile));
+
+        Assert.True(loaded.WindowPlacement.HasPlacement);
+        Assert.Equal(-1420, loaded.WindowPlacement.Left);
+        Assert.Equal(84, loaded.WindowPlacement.Top);
+        Assert.Equal(1180, loaded.WindowPlacement.Width);
+        Assert.Equal(820, loaded.WindowPlacement.Height);
+        Assert.True(loaded.WindowPlacement.IsMaximized);
+        Assert.Equal(PedalLayoutMode.Tabbed, loaded.PedalLayout);
+    }
+
+    [Fact]
     public void SerializedProfileOmitsComputedDisplayProperties()
     {
         var profile = new AppProfile();
@@ -153,7 +181,7 @@ public sealed class ProfileTests
         var serializer = new ProfileSerializer();
         var loaded = serializer.Deserialize(serializer.Serialize(profile));
 
-        Assert.Equal(6, loaded.SchemaVersion);
+        Assert.Equal(7, loaded.SchemaVersion);
         var learned = Assert.Single(loaded.LearnedPedals);
         Assert.Equal("Custom pedal", learned.Name);
         Assert.Equal(3, learned.Switches.Count);
@@ -296,7 +324,7 @@ public sealed class ProfileTests
         var serializer = new ProfileSerializer();
         var loaded = serializer.Deserialize(serializer.Serialize(profile));
 
-        Assert.Equal(6, loaded.SchemaVersion);
+        Assert.Equal(7, loaded.SchemaVersion);
         Assert.Equal("Tippy", Assert.Single(loaded.Variables).Value);
         Assert.Equal(45, loaded.Safety.MaximumMacroSeconds);
         Assert.True(loaded.Overlay.Enabled);

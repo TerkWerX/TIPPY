@@ -74,3 +74,29 @@ public sealed class RawInputSwitchMapping
         SwitchIndex = Math.Clamp(SwitchIndex, 0, 31);
     }
 }
+
+public sealed class WindowPlacementSettings
+{
+    public bool HasPlacement { get; set; }
+    public int Left { get; set; }
+    public int Top { get; set; }
+    public int Width { get; set; }
+    public int Height { get; set; }
+    public bool IsMaximized { get; set; }
+
+    public void Normalize()
+    {
+        Left = Math.Clamp(Left, -100_000, 100_000);
+        Top = Math.Clamp(Top, -100_000, 100_000);
+        Width = Math.Clamp(Width, 320, 20_000);
+        Height = Math.Clamp(Height, 240, 20_000);
+        if (!HasPlacement)
+        {
+            Left = 0;
+            Top = 0;
+            Width = 0;
+            Height = 0;
+            IsMaximized = false;
+        }
+    }
+}
