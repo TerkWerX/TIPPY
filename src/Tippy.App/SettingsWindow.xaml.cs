@@ -9,17 +9,19 @@ public partial class SettingsWindow : Window
     private readonly VirtualGamepadService _gamepad;
     private bool _capturing;
 
-    public SettingsWindow(string bankHotkey, VirtualGamepadService gamepad)
+    public SettingsWindow(string bankHotkey, bool startMinimized, VirtualGamepadService gamepad)
     {
         InitializeComponent();
         BankHotkey = bankHotkey;
         _gamepad = gamepad;
         HotkeyBox.Text = bankHotkey;
+        StartMinimizedCheckBox.IsChecked = startMinimized;
         GamepadStatusText.Text = gamepad.Status;
         PreviewKeyDown += SettingsWindow_PreviewKeyDown;
     }
 
     public string BankHotkey { get; private set; }
+    public bool StartMinimized => StartMinimizedCheckBox.IsChecked == true;
 
     private void CaptureHotkey_Click(object sender, RoutedEventArgs e)
     {

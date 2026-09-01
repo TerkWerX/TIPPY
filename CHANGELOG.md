@@ -6,6 +6,14 @@ Notable changes to Tippy are documented here.
 
 ### Added
 
+- Independent press and release actions on every switch, with backward-compatible migration of existing release-trigger assignments.
+- Program-launch macro steps with optional arguments and working directory.
+- True momentary shift layers: hold one switch to make the other switches use another bank, including safe multi-pedal release handling.
+- Event-driven foreground-application profiles with an independent target bank for every pedal and no continuous process polling.
+- Registry-driven USB pedal artwork, shared-ID model chooser, persistent per-device picture overrides, generic labeled placeholders, hot-plug registry reloads, and unknown-device audit logging.
+- Bundled community pedal image library and its integration handoff documentation.
+- Optional start-minimized-to-tray setting.
+
 - Fail-safe held-output tracking with shared-key reference counts, disconnect/lock/suspend cleanup, one-shot macro cleanup, and an emergency **Release all held inputs** tray command.
 - Dynamic, idle-armed learning and runtime support for raw-HID pedals with 1–32 digital switches, plus a generic layout for non-Infinity hardware.
 - **Run once when released** assignment behavior and automatic closing key-up events for timed recordings stopped mid-keypress.

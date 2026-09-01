@@ -50,8 +50,10 @@ The searchable catalog currently includes 557 commands across 32 Windows applica
 - Use two or more compatible USB pedals simultaneously with separate assignments.
 - Keep three independent banks on every pedal, or switch all pedals together.
 - Save, load, and copy portable `.tippy-bank.json` banks to any pedal with enough switches—including loading the same bank on several pedals.
-- Assign Windows actions, individual keys, key combinations, text strings, timed recordings, delays, mouse actions, and optional Xbox 360 gamepad buttons.
-- Choose tap-once or hold-until-release behavior.
+- Assign Windows actions, individual keys, key combinations, text strings, timed recordings, delays, mouse actions, program launches, and optional Xbox 360 gamepad buttons.
+- Give every switch independent press and release actions, or hold keyboard/gamepad output until physical release.
+- Hold a pedal as a momentary shift layer so the other switches temporarily use another bank.
+- Select independent banks automatically for the foreground Windows application, resolved only when a pedal is pressed.
 - Arrange pedal cards automatically, stacked, side by side, or in a tile grid with automatic or 1–6-column placement.
 - Use a distinct compact tabbed mode to show one full-size pedal at a time without losing its controls.
 - Drag pedal cards or compact tabs to match their physical order.
@@ -59,6 +61,7 @@ The searchable catalog currently includes 557 commands across 32 Windows applica
 - Switch between dark and light themes.
 - Send Tippy to the system tray while its pedal assignments continue running.
 - Learn unknown USB HID pedals without a driver or code change.
+- Use the bundled registry-driven artwork library, choose a picture manually for any device, and preserve unknown VID/PID details for future compatibility updates.
 - Hot-plug devices without restarting Tippy.
 
 ## Download and run
@@ -84,9 +87,9 @@ The two verified pedals use the same three-button HID protocol. Tippy distinguis
 
 Choose **Edit assignment** to search Windows or application shortcuts, type a string, capture a key combination, or record a timed sequence. Select Bank 1, 2, or 3 inside a pedal card to change only that pedal. The **All pedals** bank buttons and default `Ctrl+Alt+B` shortcut switch every connected pedal together.
 
-Every assignment can run when pressed, hold keyboard/gamepad output until the pedal is released, or run when released. Held outputs are reference-counted across simultaneous pedals and are released automatically if a pedal disconnects; **Release all held inputs** is also available from Tippy's tray menu.
+Every switch can have both a press action and a separate release action. Press actions can tap once or hold keyboard/gamepad output until physical release. Held outputs are reference-counted across simultaneous pedals and are released automatically if a pedal disconnects; **Release all held inputs** is also available from Tippy's tray menu.
 
-Assign **Switch to next bank** to a footswitch when you want completely hands-free bank changes. Use **Save bank**, **Load bank**, or **Copy to…** to reuse a setup on any compatible connected pedal.
+Assign **Switch to next bank** for hands-free cycling, or **Hold for temporary bank** for a true momentary shift layer. Use **App profiles** to map each pedal to an independent bank when a selected executable is foreground. Use **Save bank**, **Load bank**, or **Copy to…** to reuse a setup on any compatible connected pedal.
 
 Tippy autosaves its live profile here:
 
@@ -105,6 +108,8 @@ Portable profiles use `.tippy.json`; portable banks use `.tippy-bank.json`.
 5. Save the mapping and begin assigning actions immediately.
 
 The learned definition stores USB identity, a report-descriptor fingerprint, and switch rules. It does not record normal keyboard typing.
+
+Tippy also ships a data-driven pedal picture registry. The shared `VID_05F3/PID_00FF` identity cannot distinguish every Infinity/VEC/AltoEdge rebadge, so Tippy asks for the matching picture once and remembers the answer for that physical USB device. The **Picture** button permits a manual override at any time. Unknown or not-yet-verified hardware is recorded locally in `unknown_pedals.log` beside the development library, or under `%LOCALAPPDATA%\Tippy` in an installed copy.
 
 ## Gamepad output and game rules
 

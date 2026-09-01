@@ -9,29 +9,55 @@
             <RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
         <StackPanel>
-            <TextBlock Text="Assignment" FontSize="23" FontWeight="SemiBold"/>
-            <TextBlock Text="Pick a Windows or application shortcut, type a string, or build and record a custom macro."
+            <TextBlock x:Name="AssignmentHeading" Text="Assignment" FontSize="23" FontWeight="SemiBold"/>
+            <TextBlock x:Name="AssignmentSubtitle" Text="Pick a Windows or application shortcut, type a string, or build and record a custom macro."
                        Style="{StaticResource SmallMutedText}" Margin="0,4,0,0"/>
         </StackPanel>
-        <Grid Grid.Row="1" Margin="0,18,0,14">
-            <Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="16"/><ColumnDefinition/></Grid.ColumnDefinitions>
-            <StackPanel>
-                <TextBlock Text="ACTION TYPE" Style="{StaticResource SmallMutedText}" FontWeight="Bold" Margin="0,0,0,6"/>
-                <ComboBox x:Name="BindingTypeBox" SelectionChanged="BindingTypeBox_SelectionChanged">
-                    <ComboBoxItem Tag="Macro"><TextBlock Text="Run an action or macro" Foreground="#111820"/></ComboBoxItem>
-                    <ComboBoxItem Tag="BankNext"><TextBlock Text="Switch to next bank" Foreground="#111820"/></ComboBoxItem>
-                    <ComboBoxItem Tag="Disabled"><TextBlock Text="Disabled" Foreground="#111820"/></ComboBoxItem>
+        <StackPanel Grid.Row="1" Margin="0,18,0,14">
+            <Grid>
+                <Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="16"/><ColumnDefinition/></Grid.ColumnDefinitions>
+                <StackPanel x:Name="BindingTypePanel">
+                    <TextBlock Text="ACTION TYPE" Style="{StaticResource SmallMutedText}" FontWeight="Bold" Margin="0,0,0,6"/>
+                    <ComboBox x:Name="BindingTypeBox" SelectionChanged="BindingTypeBox_SelectionChanged">
+                        <ComboBoxItem Tag="Macro"><TextBlock Text="Run an action or macro" Foreground="#111820"/></ComboBoxItem>
+                        <ComboBoxItem Tag="BankNext"><TextBlock Text="Switch to next bank" Foreground="#111820"/></ComboBoxItem>
+                        <ComboBoxItem Tag="Disabled"><TextBlock Text="Disabled" Foreground="#111820"/></ComboBoxItem>
+                        <ComboBoxItem Tag="ShiftLayer"><TextBlock Text="Hold for temporary bank" Foreground="#111820"/></ComboBoxItem>
+                    </ComboBox>
+                </StackPanel>
+                <StackPanel x:Name="TriggerModePanel" Grid.Column="2">
+                    <TextBlock Text="PRESS BEHAVIOR" Style="{StaticResource SmallMutedText}" FontWeight="Bold" Margin="0,0,0,6"/>
+                    <ComboBox x:Name="TriggerModeBox">
+                        <ComboBoxItem Tag="PressOnce"><TextBlock Text="Run once when pressed" Foreground="#111820"/></ComboBoxItem>
+                        <ComboBoxItem Tag="WhileHeld"><TextBlock Text="Hold keys/buttons until released" Foreground="#111820"/></ComboBoxItem>
+                    </ComboBox>
+                </StackPanel>
+            </Grid>
+            <StackPanel x:Name="ShiftBankPanel" Visibility="Collapsed" Margin="0,12,0,0">
+                <TextBlock Text="TEMPORARY BANK WHILE HELD" Style="{StaticResource SmallMutedText}" FontWeight="Bold" Margin="0,0,0,6"/>
+                <ComboBox x:Name="ShiftBankBox" Width="180" HorizontalAlignment="Left">
+                    <ComboBoxItem><TextBlock Text="Bank 1" Foreground="#111820"/></ComboBoxItem>
+                    <ComboBoxItem><TextBlock Text="Bank 2" Foreground="#111820"/></ComboBoxItem>
+                    <ComboBoxItem><TextBlock Text="Bank 3" Foreground="#111820"/></ComboBoxItem>
                 </ComboBox>
+                <TextBlock Text="Other switches use this bank until the shift pedal is released. The saved active bank is not changed."
+                           Style="{StaticResource SmallMutedText}" Margin="0,6,0,0"/>
             </StackPanel>
-            <StackPanel Grid.Column="2">
-                <TextBlock Text="TRIGGER BEHAVIOR" Style="{StaticResource SmallMutedText}" FontWeight="Bold" Margin="0,0,0,6"/>
-                <ComboBox x:Name="TriggerModeBox">
-                    <ComboBoxItem Tag="PressOnce"><TextBlock Text="Run once when pressed" Foreground="#111820"/></ComboBoxItem>
-                    <ComboBoxItem Tag="WhileHeld"><TextBlock Text="Hold keys/buttons until released" Foreground="#111820"/></ComboBoxItem>
-                    <ComboBoxItem Tag="ReleaseOnce"><TextBlock Text="Run once when released" Foreground="#111820"/></ComboBoxItem>
-                </ComboBox>
-            </StackPanel>
-        </Grid>
+            <Border x:Name="ReleaseActionBorder" Background="{DynamicResource SurfaceAltBrush}" BorderBrush="{DynamicResource BorderBrush}"
+                    BorderThickness="1" CornerRadius="8" Padding="12" Margin="0,12,0,0">
+                <Grid>
+                    <Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                    <StackPanel>
+                        <TextBlock Text="RELEASE ACTION" Style="{StaticResource SmallMutedText}" FontWeight="Bold"/>
+                        <TextBlock x:Name="ReleaseActionSummary" Text="No action when released" Margin="0,4,12,0" TextTrimming="CharacterEllipsis"/>
+                    </StackPanel>
+                    <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                        <Button Content="Edit release" Click="EditReleaseAction_Click" Margin="0,0,7,0"/>
+                        <Button x:Name="ClearReleaseButton" Content="Clear" Click="ClearReleaseAction_Click"/>
+                    </StackPanel>
+                </Grid>
+            </Border>
+        </StackPanel>
         <TabControl x:Name="MacroArea" Grid.Row="2" Background="{DynamicResource SurfaceBrush}"
                     BorderBrush="{DynamicResource BorderBrush}" Foreground="{DynamicResource TextBrush}">
             <TabItem>
@@ -126,7 +152,7 @@
                     <Grid Grid.Row="1" Margin="0,12"><Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="8"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><TextBox x:Name="TextStringBox" Padding="8" ToolTip="Text Tippy will type exactly as entered"/><Button Grid.Column="2" Content="Add typed string" Click="AddString_Click"/></Grid>
                     <TextBlock Grid.Row="2" Text="MACRO STEPS" Style="{StaticResource SmallMutedText}" FontWeight="Bold" Margin="0,0,0,7"/>
                     <ListBox x:Name="StepsList" Grid.Row="3" SelectionMode="Single" Padding="5"/>
-                    <WrapPanel Grid.Row="4" Margin="0,10,0,0"><Button x:Name="RecordButton" Content="Start timed recording" Click="Record_Click" Margin="0,0,7,7" Background="{DynamicResource AccentSoftBrush}"/><Button x:Name="CaptureButton" Content="Capture shortcut" Click="CaptureShortcut_Click" Margin="0,0,7,7"/><Button Content="Type text" Click="AddText_Click" Margin="0,0,7,7"/><Button Content="Wait" Click="AddDelay_Click" Margin="0,0,7,7"/><Button Content="Mouse" Click="AddMouse_Click" Margin="0,0,7,7"/><Button Content="Gamepad" Click="AddGamepad_Click" Margin="0,0,7,7"/></WrapPanel>
+                    <WrapPanel Grid.Row="4" Margin="0,10,0,0"><Button x:Name="RecordButton" Content="Start timed recording" Click="Record_Click" Margin="0,0,7,7" Background="{DynamicResource AccentSoftBrush}"/><Button x:Name="CaptureButton" Content="Capture shortcut" Click="CaptureShortcut_Click" Margin="0,0,7,7"/><Button Content="Type text" Click="AddText_Click" Margin="0,0,7,7"/><Button Content="Wait" Click="AddDelay_Click" Margin="0,0,7,7"/><Button Content="Mouse" Click="AddMouse_Click" Margin="0,0,7,7"/><Button Content="Gamepad" Click="AddGamepad_Click" Margin="0,0,7,7"/><Button Content="Program" Click="AddProgram_Click" Margin="0,0,7,7"/></WrapPanel>
                     <Grid Grid.Row="5" Margin="0,3,0,0"><TextBlock x:Name="CaptureHint" Text="Steps run from top to bottom." Style="{StaticResource SmallMutedText}" VerticalAlignment="Center"/><StackPanel Orientation="Horizontal" HorizontalAlignment="Right"><Button Content="↑" Click="MoveUp_Click" Padding="10,5" Margin="0,0,5,0"/><Button Content="↓" Click="MoveDown_Click" Padding="10,5" Margin="0,0,5,0"/><Button Content="Remove" Click="RemoveStep_Click" Padding="10,5"/></StackPanel></Grid>
                 </Grid>
             </TabItem>

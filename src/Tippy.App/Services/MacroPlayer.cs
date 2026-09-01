@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using Tippy.Core.Input;
 using Tippy.Core.Models;
 
@@ -211,6 +212,9 @@ public sealed class MacroPlayer : IDisposable
                             Release(ownerId, [], [button]);
                         }
                         break;
+                    case MacroStepType.LaunchProgram:
+                        ExecuteInjection(token, () => LaunchProgram(step));
+                        break;
                 }
             }
         }
@@ -258,6 +262,27 @@ public sealed class MacroPlayer : IDisposable
     {
         token.ThrowIfCancellationRequested();
         if (!_acceptingInput) throw new OperationCanceledException(token);
+    }
+
+    private static void LaunchProgram(MacroStep step)
+    {
+        var executable = Environment.ExpandEnvironmentVariables(step.Value?.Trim() ?? string.Empty);
+        if (string.IsNullOrWhiteSpace(executable))
+        {
+            throw new InvalidOperationException("The program step has no executable path.");
+        }
+        var workingDirectory = Environment.ExpandEnvironmentVariables(step.WorkingDirectory?.Trim() ?? string.Empty);
+        if (string.IsNullOrWhiteSpace(workingDirectory) && Path.IsPathFullyQualified(executable))
+        {
+            workingDirectory = Path.GetDirectoryName(executable) ?? string.Empty;
+        }
+        Process.Start(new ProcessStartInfo
+        {
+            FileName = executable,
+            Arguments = step.Arguments ?? string.Empty,
+            WorkingDirectory = workingDirectory,
+            UseShellExecute = true
+        });
     }
 
     private void Release(string ownerId, IEnumerable<string> keys, IEnumerable<string> buttons)

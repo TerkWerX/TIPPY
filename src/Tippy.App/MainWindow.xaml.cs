@@ -5,6 +5,7 @@ using System.Windows.Media.Imaging;
 using Microsoft.Win32;
 using Tippy.App.Models;
 using Tippy.App.Services;
+using Tippy.Core.Input;
 using Tippy.Core.Models;
 
 namespace Tippy.App;
@@ -26,10 +27,15 @@ public partial class MainWindow : Window
     private readonly VirtualGamepadService _gamepad = new();
     private readonly MacroPlayer _macroPlayer;
     private readonly GlobalHotkeyService _hotkey = new();
+    private readonly ForegroundApplicationService _foregroundApplications = new();
+    private readonly PedalBankResolver _bankResolver = new();
+    private readonly PedalRegistryService _pedalRegistry = new();
     private readonly Dictionary<string, PedalDeviceInfo> _connected = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<(string DeviceKey, int SwitchIndex), Border> _switchTiles = new();
     private readonly Dictionary<string, Border> _pedalTabHeaders = new(StringComparer.OrdinalIgnoreCase);
     private readonly HashSet<(string DeviceKey, int SwitchIndex)> _pressedSwitches = [];
+    private readonly HashSet<string> _artworkPickerQueued = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Queue<(PedalDeviceProfile Profile, PedalDeviceInfo Info)> _pendingArtworkPickers = new();
     private readonly Dictionary<(string DeviceKey, int SwitchIndex), MacroDefinition> _activeHeldMacros = new();
     private readonly Dictionary<(string DeviceKey, int SwitchIndex), MacroDefinition> _pendingReleaseMacros = new();
     private readonly List<Button> _bankButtons = [];
@@ -48,6 +54,8 @@ public partial class MainWindow : Window
     private string? _draggedPedalKey;
     private System.Windows.Forms.NotifyIcon? _trayIcon;
     private bool _trayTipShown;
+    private string? _activeApplicationProfileId;
+    private bool _artworkPickerOpen;
 
     public MainWindow()
     {
@@ -60,6 +68,7 @@ public partial class MainWindow : Window
         SourceInitialized += (_, _) => RegisterBankHotkey();
         _hid.ConnectionChanged += Hid_ConnectionChanged;
         _hid.StateChanged += Hid_StateChanged;
+        _hid.ScanCompleted += Hid_ScanCompleted;
         _hid.Diagnostic += (_, message) => Dispatcher.Invoke(() => SetStatus(message));
         _macroPlayer.PlaybackError += (_, error) => Dispatcher.Invoke(() => SetStatus(error, true));
         SystemEvents.SessionSwitch += SystemEvents_SessionSwitch;
@@ -80,6 +89,7 @@ public partial class MainWindow : Window
         }
 
         _profile.Normalize();
+        _pedalRegistry.Reload();
         ThemeService.Apply(_profile.Theme);
         SetLayoutSelector();
         _loaded = true;
@@ -90,6 +100,10 @@ public partial class MainWindow : Window
         _hid.ConfigureLearnedDevices(_profile.LearnedPedals);
         _hid.Start();
         SetStatus("Listening for USB foot controls");
+        if (_profile.StartMinimized)
+        {
+            _ = Dispatcher.BeginInvoke(new Action(HideToTray));
+        }
     }
 
     private void Hid_ConnectionChanged(object? sender, PedalConnectionEventArgs e)
@@ -98,6 +112,7 @@ public partial class MainWindow : Window
         {
             if (e.IsConnected)
             {
+                _pedalRegistry.Reload();
                 _connected[e.Device.DeviceKey] = e.Device;
                 var deviceProfile = _profile.Devices.FirstOrDefault(device =>
                     device.DeviceKey.Equals(e.Device.DeviceKey, StringComparison.OrdinalIgnoreCase));
@@ -116,6 +131,17 @@ public partial class MainWindow : Window
                     deviceProfile.Normalize();
                     ScheduleSave();
                 }
+                var needsAmbiguousChoice = string.IsNullOrWhiteSpace(deviceProfile.ArtworkKey) &&
+                                           _pedalRegistry.IsAmbiguous(e.Device);
+                if (string.IsNullOrWhiteSpace(deviceProfile.ArtworkKey))
+                {
+                    deviceProfile.ArtworkKey = _pedalRegistry.ResolveArtwork(string.Empty, e.Device)?.Key ?? string.Empty;
+                    ScheduleSave();
+                }
+                if (needsAmbiguousChoice && _artworkPickerQueued.Add(deviceProfile.DeviceKey))
+                {
+                    QueueArtworkPicker(deviceProfile, e.Device);
+                }
             }
             else
             {
@@ -127,40 +153,44 @@ public partial class MainWindow : Window
         });
     }
 
+    private void Hid_ScanCompleted(object? sender, EventArgs e)
+    {
+        _ = Task.Run(() =>
+        {
+            try
+            {
+                _pedalRegistry.AuditCandidates(new HidLearningService().ListCandidates());
+            }
+            catch (Exception exception)
+            {
+                Dispatcher.BeginInvoke(new Action(() =>
+                    SetStatus($"Pedal library audit failed: {exception.Message}", true)));
+            }
+        });
+    }
+
     private void Hid_StateChanged(object? sender, PedalStateEventArgs e)
     {
         Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Send, new Action(() =>
         {
             if (_inputSuspended) return;
-            RawReportText.Text = $"{e.Device.DisplayName}: {Convert.ToHexString(e.RawReport)}";
             var triggerId = $"{e.Device.DeviceKey}:{e.SwitchIndex}";
             var key = (e.Device.DeviceKey, e.SwitchIndex);
+            ApplicationProfileRule? applicationProfile = null;
+            if (e.IsPressed)
+            {
+                applicationProfile = ResolveForegroundApplicationProfile();
+                SetActiveApplicationProfile(applicationProfile);
+            }
+
+            RawReportText.Text = $"{e.Device.DisplayName}: {Convert.ToHexString(e.RawReport)}";
             if (e.IsPressed) _pressedSwitches.Add(key);
             else _pressedSwitches.Remove(key);
-            if (_switchTiles.TryGetValue(key, out var tile))
-            {
-                var generic = Equals(tile.Tag, "GenericSwitch");
-                tile.Background = e.IsPressed
-                    ? new SolidColorBrush(Color.FromArgb(145, 70, 205, 255))
-                    : generic ? (Brush)FindResource("SurfaceBrush") : Brushes.Transparent;
-                tile.BorderBrush = e.IsPressed
-                    ? new SolidColorBrush(Color.FromRgb(86, 220, 255))
-                    : generic ? (Brush)FindResource("BorderBrush") : Brushes.Transparent;
-                tile.BorderThickness = generic && !e.IsPressed ? new Thickness(2) : new Thickness(4);
-                tile.RenderTransform = e.IsPressed ? new ScaleTransform(0.985, 0.985) : Transform.Identity;
-                tile.RenderTransformOrigin = new Point(0.5, 0.5);
-            }
-            if (_pedalTabHeaders.TryGetValue(e.Device.DeviceKey, out var tabHeader))
-            {
-                var anyPressed = _pressedSwitches.Any(item =>
-                    item.DeviceKey.Equals(e.Device.DeviceKey, StringComparison.OrdinalIgnoreCase));
-                tabHeader.Background = anyPressed
-                    ? (Brush)FindResource("AccentSoftBrush")
-                    : Brushes.Transparent;
-            }
+            UpdatePressedVisual(key, e.IsPressed);
 
             if (!e.IsPressed)
             {
+                var releasedShift = _bankResolver.ReleaseShift(e.Device.DeviceKey, e.SwitchIndex);
                 if (_activeHeldMacros.Remove(key, out _))
                 {
                     _macroPlayer.ReleaseHeld(triggerId);
@@ -172,6 +202,16 @@ public partial class MainWindow : Window
                         _macroPlayer.Handle(triggerId, releaseMacro, false);
                     }
                 }
+                if (releasedShift)
+                {
+                    RefreshDevices();
+                    var releasedDevice = _profile.Devices.FirstOrDefault(profileDevice =>
+                        profileDevice.DeviceKey.Equals(e.Device.DeviceKey, StringComparison.OrdinalIgnoreCase));
+                    if (releasedDevice is not null)
+                    {
+                        SetStatus($"{releasedDevice.DisplayName} · momentary layer released · Bank {GetEffectiveBankIndex(releasedDevice) + 1}");
+                    }
+                }
                 return;
             }
 
@@ -181,31 +221,98 @@ public partial class MainWindow : Window
             {
                 return;
             }
-            var binding = device.Banks[device.ActiveBankIndex].Bindings[e.SwitchIndex];
+            var bankIndex = _bankResolver.Resolve(device, applicationProfile);
+            var binding = device.Banks[bankIndex].Bindings[e.SwitchIndex];
             switch (binding.Type)
             {
                 case PedalBindingType.BankNext:
                     SwitchPedalBank(device, (device.ActiveBankIndex + 1) % AppProfile.MaxBanks);
                     break;
+                case PedalBindingType.ShiftLayer:
+                    _bankResolver.ActivateShift(device.DeviceKey, e.SwitchIndex, binding.ShiftBankIndex);
+                    RefreshDevices();
+                    UpdatePressedVisual(key, true);
+                    SetStatus($"{device.DisplayName} · momentary Bank {binding.ShiftBankIndex + 1} active while held");
+                    break;
                 case PedalBindingType.Macro:
+                    if (binding.ReleaseMacro.Steps.Count > 0)
+                    {
+                        _pendingReleaseMacros[key] = binding.ReleaseMacro.Clone();
+                    }
                     var macro = binding.Macro.Clone();
-                    if (macro.TriggerMode == MacroTriggerMode.WhileHeld)
+                    if (macro.Steps.Count > 0)
                     {
-                        _activeHeldMacros[key] = macro;
+                        if (macro.TriggerMode == MacroTriggerMode.WhileHeld)
+                        {
+                            _activeHeldMacros[key] = macro;
+                        }
+                        else if (macro.TriggerMode == MacroTriggerMode.ReleaseOnce)
+                        {
+                            _pendingReleaseMacros[key] = macro;
+                        }
+                        _macroPlayer.Handle(triggerId, macro, true);
                     }
-                    else if (macro.TriggerMode == MacroTriggerMode.ReleaseOnce)
-                    {
-                        _pendingReleaseMacros[key] = macro;
-                    }
-                    _macroPlayer.Handle(triggerId, macro, true);
-                    SetStatus($"{e.Device.DisplayName} · Pedal {e.SwitchIndex + 1} · {binding.DisplayName}");
+                    var context = applicationProfile is null ? string.Empty : $" · {applicationProfile.Name}";
+                    SetStatus($"{e.Device.DisplayName} · Bank {bankIndex + 1}{context} · Pedal {e.SwitchIndex + 1} · {binding.DisplayName}");
                     break;
             }
         }));
     }
 
+    private void UpdatePressedVisual((string DeviceKey, int SwitchIndex) key, bool isPressed)
+    {
+        if (_switchTiles.TryGetValue(key, out var tile))
+        {
+            var generic = Equals(tile.Tag, "GenericSwitch");
+            tile.Background = isPressed
+                ? new SolidColorBrush(Color.FromArgb(145, 70, 205, 255))
+                : generic ? (Brush)FindResource("SurfaceBrush") : Brushes.Transparent;
+            tile.BorderBrush = isPressed
+                ? new SolidColorBrush(Color.FromRgb(86, 220, 255))
+                : generic ? (Brush)FindResource("BorderBrush") : Brushes.Transparent;
+            tile.BorderThickness = generic && !isPressed ? new Thickness(2) : new Thickness(4);
+            tile.RenderTransform = isPressed ? new ScaleTransform(0.985, 0.985) : Transform.Identity;
+            tile.RenderTransformOrigin = new Point(0.5, 0.5);
+        }
+        if (_pedalTabHeaders.TryGetValue(key.DeviceKey, out var tabHeader))
+        {
+            var anyPressed = _pressedSwitches.Any(item =>
+                item.DeviceKey.Equals(key.DeviceKey, StringComparison.OrdinalIgnoreCase));
+            tabHeader.Background = anyPressed
+                ? (Brush)FindResource("AccentSoftBrush")
+                : Brushes.Transparent;
+        }
+    }
+
+    private ApplicationProfileRule? ResolveForegroundApplicationProfile()
+    {
+        var foreground = _foregroundApplications.GetCurrent();
+        if (foreground is null) return null;
+        return _profile.ApplicationProfiles.FirstOrDefault(profile =>
+            profile.Matches(foreground.ProcessName, foreground.ExecutablePath));
+    }
+
+    private void SetActiveApplicationProfile(ApplicationProfileRule? profile)
+    {
+        var id = profile?.Id;
+        if (string.Equals(_activeApplicationProfileId, id, StringComparison.OrdinalIgnoreCase)) return;
+        _activeApplicationProfileId = id;
+        RefreshDevices();
+        UpdateHeader();
+    }
+
+    private ApplicationProfileRule? GetActiveApplicationProfile() =>
+        string.IsNullOrWhiteSpace(_activeApplicationProfileId)
+            ? null
+            : _profile.ApplicationProfiles.FirstOrDefault(profile =>
+                profile.Id.Equals(_activeApplicationProfileId, StringComparison.OrdinalIgnoreCase));
+
+    private int GetEffectiveBankIndex(PedalDeviceProfile device) =>
+        _bankResolver.Resolve(device, GetActiveApplicationProfile());
+
     private void ReleaseActionsForDevice(string deviceKey)
     {
+        _bankResolver.ReleaseDevice(deviceKey);
         _pressedSwitches.RemoveWhere(key =>
             key.DeviceKey.Equals(deviceKey, StringComparison.OrdinalIgnoreCase));
         foreach (var key in _activeHeldMacros.Keys
@@ -452,8 +559,21 @@ public partial class MainWindow : Window
                 FontSize = 11, FontWeight = FontWeights.Bold
             }
         };
-        Grid.SetColumn(badge, 2);
-        header.Children.Add(badge);
+        var headerTools = new StackPanel { Orientation = Orientation.Horizontal };
+        var pictureButton = new Button
+        {
+            Content = "Picture", Padding = new Thickness(10, 5, 10, 5),
+            Margin = new Thickness(0, 0, 8, 0), ToolTip = "Choose the artwork used for this pedal"
+        };
+        pictureButton.Click += (_, _) =>
+        {
+            var info = GetDeviceInfo(device);
+            ShowArtworkPicker(device, info, _pedalRegistry.IsAmbiguous(info));
+        };
+        headerTools.Children.Add(pictureButton);
+        headerTools.Children.Add(badge);
+        Grid.SetColumn(headerTools, 2);
+        header.Children.Add(headerTools);
         stack.Children.Add(header);
         stack.Children.Add(CreateDeviceBankBar(device, compact));
         stack.Children.Add(CreatePedalVisual(device, connected));
@@ -462,6 +582,9 @@ public partial class MainWindow : Window
 
     private FrameworkElement CreateDeviceBankBar(PedalDeviceProfile device, bool compact)
     {
+        var effectiveBankIndex = GetEffectiveBankIndex(device);
+        var applicationProfile = GetActiveApplicationProfile();
+        var isShifted = _bankResolver.IsShifted(device.DeviceKey);
         var bar = new Border
         {
             Background = (Brush)FindResource("SurfaceAltBrush"),
@@ -477,13 +600,17 @@ public partial class MainWindow : Window
         var bankPanel = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
         bankPanel.Children.Add(new TextBlock
         {
-            Text = "BANK", Style = (Style)FindResource("SmallMutedText"), FontWeight = FontWeights.Bold,
+            Text = isShifted ? "SHIFT BANK" : applicationProfile is null ? "BANK" : "APP BANK",
+            ToolTip = isShifted
+                ? "A momentary layer is active"
+                : applicationProfile is null ? null : $"{applicationProfile.Name} foreground profile",
+            Style = (Style)FindResource("SmallMutedText"), FontWeight = FontWeights.Bold,
             VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 7, 0)
         });
         for (var index = 0; index < AppProfile.MaxBanks; index++)
         {
             var bankIndex = index;
-            var active = device.ActiveBankIndex == index;
+            var active = effectiveBankIndex == index;
             var button = new Button
             {
                 Content = (index + 1).ToString(), Padding = new Thickness(10, 4, 10, 4),
@@ -701,27 +828,31 @@ public partial class MainWindow : Window
 
     private FrameworkElement CreatePedalVisual(PedalDeviceProfile device, bool connected)
     {
-        if (device.VendorId != Tippy.Core.Input.InfinityReportDecoder.VendorId ||
-            device.ProductId != Tippy.Core.Input.InfinityReportDecoder.ProductId)
+        var artwork = _pedalRegistry.ResolveArtwork(device.ArtworkKey, GetDeviceInfo(device));
+        if (artwork is null || string.IsNullOrWhiteSpace(artwork.ImagePath))
         {
-            return CreateGenericPedalVisual(device, connected);
+            return CreateGenericPedalVisual(device, connected, artwork?.ModelLabel);
         }
 
-        var altoEdge = device.DisplayName.Contains("Alto", StringComparison.OrdinalIgnoreCase);
         var canvas = new Grid
         {
             Width = 760,
             Height = 485,
             Opacity = connected ? 1 : 0.58
         };
-        canvas.Children.Add(new Image
+        try
         {
-            Source = new BitmapImage(new Uri(altoEdge
-                ? "/Tippy;component/Assets/Pedals/altoedge-in-ae-s-scale-matched.png"
-                : "/Tippy;component/Assets/Pedals/infinity-in-usb-2.png", UriKind.RelativeOrAbsolute)),
-            Stretch = Stretch.Uniform,
-            SnapsToDevicePixels = true
-        });
+            var bitmap = LoadArtworkBitmap(artwork.ImagePath);
+            bitmap.Freeze();
+            canvas.Children.Add(new Image
+            {
+                Source = bitmap, Stretch = Stretch.Uniform, SnapsToDevicePixels = true
+            });
+        }
+        catch
+        {
+            return CreateGenericPedalVisual(device, connected, artwork.ModelLabel);
+        }
 
         var overlays = new Grid { Margin = new Thickness(36, 24, 36, 30) };
         canvas.Children.Add(overlays);
@@ -751,7 +882,7 @@ public partial class MainWindow : Window
         };
     }
 
-    private FrameworkElement CreateGenericPedalVisual(PedalDeviceProfile device, bool connected)
+    private FrameworkElement CreateGenericPedalVisual(PedalDeviceProfile device, bool connected, string? modelLabel = null)
     {
         var columns = Math.Min(6, Math.Max(1, (int)Math.Ceiling(Math.Sqrt(device.SwitchCount))));
         var rows = (int)Math.Ceiling(device.SwitchCount / (double)columns);
@@ -773,6 +904,18 @@ public partial class MainWindow : Window
             tile.ToolTip = $"Switch {index + 1}";
             panel.Children.Add(tile);
         }
+        var shell = new Grid { Width = 760 };
+        shell.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        shell.RowDefinitions.Add(new RowDefinition());
+        shell.Children.Add(new TextBlock
+        {
+            Text = string.IsNullOrWhiteSpace(modelLabel) ? $"Unknown pedal · VID_{device.VendorId:X4} PID_{device.ProductId:X4}" : modelLabel,
+            HorizontalAlignment = HorizontalAlignment.Center, Margin = new Thickness(0, 12, 0, 10),
+            FontSize = 18, FontWeight = FontWeights.SemiBold,
+            Foreground = (Brush)FindResource("MutedTextBrush")
+        });
+        Grid.SetRow(panel, 1);
+        shell.Children.Add(panel);
         return new Viewbox
         {
             Stretch = Stretch.Uniform,
@@ -781,13 +924,67 @@ public partial class MainWindow : Window
                 ? 485
                 : ShouldUseSideBySide() ? 325 : 440,
             HorizontalAlignment = HorizontalAlignment.Stretch,
-            Child = panel
+            Child = shell
         };
+    }
+
+    private PedalDeviceInfo GetDeviceInfo(PedalDeviceProfile device) =>
+        _connected.TryGetValue(device.DeviceKey, out var connected)
+            ? connected
+            : new PedalDeviceInfo(device.DeviceKey, device.DisplayName, device.VendorId, device.ProductId,
+                string.Empty, string.Empty, device.SwitchCount);
+
+    private void ShowArtworkPicker(PedalDeviceProfile device, PedalDeviceInfo info, bool ambiguous)
+    {
+        var options = _pedalRegistry.GetArtworkOptions();
+        var picker = new PedalArtworkPickerWindow(device.DisplayName, info.VidPid, options,
+            device.ArtworkKey, ambiguous) { Owner = this };
+        if (picker.ShowDialog() != true || string.IsNullOrWhiteSpace(picker.SelectedArtworkKey)) return;
+        device.ArtworkKey = picker.SelectedArtworkKey;
+        RefreshDevices();
+        ScheduleSave();
+        SetStatus($"Updated picture for {device.DisplayName}");
+    }
+
+    private void QueueArtworkPicker(PedalDeviceProfile device, PedalDeviceInfo info)
+    {
+        _pendingArtworkPickers.Enqueue((device, info));
+        _ = Dispatcher.BeginInvoke(new Action(ShowNextArtworkPicker));
+    }
+
+    private void ShowNextArtworkPicker()
+    {
+        if (_artworkPickerOpen || _pendingArtworkPickers.Count == 0) return;
+        var pending = _pendingArtworkPickers.Dequeue();
+        _artworkPickerOpen = true;
+        try
+        {
+            ShowArtworkPicker(pending.Profile, pending.Info, true);
+        }
+        finally
+        {
+            _artworkPickerOpen = false;
+            if (_pendingArtworkPickers.Count > 0)
+                _ = Dispatcher.BeginInvoke(new Action(ShowNextArtworkPicker));
+        }
+    }
+
+    private static BitmapImage LoadArtworkBitmap(string path)
+    {
+        if (path.StartsWith("/", StringComparison.Ordinal))
+            return new BitmapImage(new Uri(path, UriKind.Relative));
+        var bitmap = new BitmapImage();
+        bitmap.BeginInit();
+        bitmap.CacheOption = BitmapCacheOption.OnLoad;
+        bitmap.UriSource = new Uri(path, UriKind.Absolute);
+        bitmap.EndInit();
+        return bitmap;
     }
 
     private Border CreateSwitchOverlay(PedalDeviceProfile device, int switchIndex, bool connected)
     {
-        var binding = device.Banks[device.ActiveBankIndex].Bindings[switchIndex];
+        var bankIndex = GetEffectiveBankIndex(device);
+        var binding = device.Banks[bankIndex].Bindings[switchIndex];
         var tile = new Border
         {
             Background = Brushes.Transparent, BorderBrush = Brushes.Transparent,
@@ -824,23 +1021,24 @@ public partial class MainWindow : Window
             Content = "Edit assignment", HorizontalAlignment = HorizontalAlignment.Center,
             Padding = new Thickness(11, 5, 11, 5), FontSize = 13
         };
-        edit.Click += (_, _) => EditBinding(device, switchIndex);
+        edit.Click += (_, _) => EditBinding(device, switchIndex, bankIndex);
         description.Children.Add(edit);
         Grid.SetRow(labelPanel, 1);
         grid.Children.Add(labelPanel);
         return tile;
     }
 
-    private void EditBinding(PedalDeviceProfile device, int switchIndex)
+    private void EditBinding(PedalDeviceProfile device, int switchIndex, int? bankIndex = null)
     {
-        var binding = device.Banks[device.ActiveBankIndex].Bindings[switchIndex];
+        var targetBankIndex = Math.Clamp(bankIndex ?? device.ActiveBankIndex, 0, AppProfile.MaxBanks - 1);
+        var binding = device.Banks[targetBankIndex].Bindings[switchIndex];
         var editor = new MacroEditorWindow(binding)
         {
-            Owner = this, Title = $"Bank {device.ActiveBankIndex + 1} · {device.DisplayName} · Pedal {switchIndex + 1}"
+            Owner = this, Title = $"Bank {targetBankIndex + 1} · {device.DisplayName} · Pedal {switchIndex + 1}"
         };
         if (editor.ShowDialog() == true)
         {
-            device.Banks[device.ActiveBankIndex].Bindings[switchIndex] = editor.Result;
+            device.Banks[targetBankIndex].Bindings[switchIndex] = editor.Result;
             RefreshDevices();
             ScheduleSave();
         }
@@ -852,7 +1050,10 @@ public partial class MainWindow : Window
         if (dialog.ShowDialog(this) != true) return;
         try
         {
+            ReleaseAllInputs();
             _profile = await _profileStore.LoadAsync(dialog.FileName);
+            _activeApplicationProfileId = null;
+            _bankResolver.Clear();
             ThemeService.Apply(_profile.Theme);
             SetLayoutSelector();
             _hid.ConfigureLearnedDevices(_profile.LearnedPedals);
@@ -888,12 +1089,29 @@ public partial class MainWindow : Window
 
     private void Settings_Click(object sender, RoutedEventArgs e)
     {
-        var settings = new SettingsWindow(_profile.BankHotkey, _gamepad) { Owner = this };
+        var settings = new SettingsWindow(_profile.BankHotkey, _profile.StartMinimized, _gamepad) { Owner = this };
         if (settings.ShowDialog() == true)
         {
             _profile.BankHotkey = settings.BankHotkey;
+            _profile.StartMinimized = settings.StartMinimized;
             RegisterBankHotkey(); UpdateHeader(); ScheduleSave();
         }
+    }
+
+    private void ApplicationProfiles_Click(object sender, RoutedEventArgs e)
+    {
+        var editor = new ApplicationProfilesWindow(_profile.ApplicationProfiles, _profile.Devices)
+        {
+            Owner = this
+        };
+        if (editor.ShowDialog() != true) return;
+        _profile.ApplicationProfiles = editor.Result.Select(profile => profile.Clone()).ToList();
+        foreach (var profile in _profile.ApplicationProfiles) profile.Normalize();
+        _activeApplicationProfileId = null;
+        RefreshDevices();
+        UpdateHeader();
+        ScheduleSave();
+        SetStatus($"Saved {_profile.ApplicationProfiles.Count} foreground application profile{(_profile.ApplicationProfiles.Count == 1 ? string.Empty : "s")}");
     }
 
     private void Help_Click(object sender, RoutedEventArgs e)
@@ -977,6 +1195,7 @@ public partial class MainWindow : Window
             _inputSuspended = true;
             generation = ++_inputStateGeneration;
             _macroPlayer.Suspend();
+            _bankResolver.Clear();
         }
         QueueSuspendedUiUpdate(generation);
     }
@@ -1045,7 +1264,9 @@ public partial class MainWindow : Window
     {
         _activeHeldMacros.Clear();
         _pendingReleaseMacros.Clear();
+        _bankResolver.Clear();
         SetStatus(status);
+        if (_loaded) RefreshDevices();
     }
 
     private void MinimizeToTray_Click(object sender, RoutedEventArgs e) => HideToTray();
@@ -1279,7 +1500,10 @@ public partial class MainWindow : Window
     private void UpdateHeader()
     {
         ThemeButton.Content = _profile.Theme == AppTheme.Dark ? "Light mode" : "Dark mode";
-        BankHintText.Text = $"{_profile.BankHotkey.Replace("+", " + ")} switches bank";
+        var applicationProfile = GetActiveApplicationProfile();
+        BankHintText.Text = applicationProfile is null
+            ? $"{_profile.BankHotkey.Replace("+", " + ")} switches bank"
+            : $"{applicationProfile.Name} profile · {_profile.BankHotkey.Replace("+", " + ")} switches bank";
     }
 
     private void SetStatus(string text, bool isError = false)

@@ -36,4 +36,13 @@
     <Resource Include="Assets\Icons\tippy.ico" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Content Include="..\..\Claude\pedals\pedal_registry.json" Link="PedalLibrary\pedal_registry.json"
+             CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <Content Include="..\..\Claude\pedals\*.png" Link="PedalLibrary\%(Filename)%(Extension)"
+             CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <Content Include="..\..\Claude\pedals\manifest.csv" Link="PedalLibrary\manifest.csv"
+             CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+  </ItemGroup>
+
 </Project>

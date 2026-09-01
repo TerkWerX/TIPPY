@@ -7,7 +7,7 @@ Tippy exists to make useful, low-latency controllers out of USB foot controls wh
 - **A release must never be optional.** Tippy tracks held keyboard and gamepad outputs by owner, shares common modifiers safely across simultaneous pedals, synthesizes releases when a reader disappears, and releases everything on session lock, suspend, shutdown, or through the tray emergency command.
 - **Idle work stays near zero.** Each connected raw-HID pedal uses an asynchronous blocking read. Reconnect attempts use bounded exponential delays rather than a tight polling loop.
 - **Device support is layered.** Verified devices receive a built-in decoder. Other raw-HID button devices can be taught locally. A learned definition is data stored in the profile, not a new driver or code plug-in.
-- **Hardware truth is visible.** Verified Infinity-family devices use their matching artwork. Learned controls use a generic switch layout rather than pretending to be a different physical pedal.
+- **Hardware truth is visible.** A data-driven registry maps identities and product strings to aspect-preserving artwork. Shared identities prompt for the real shell, and unsupported devices use a labeled generic layout rather than pretending to be different hardware.
 - **Profiles stay portable.** Pedal banks and full Tippy profiles remain ordinary JSON files that can be backed up and moved without vendor software.
 
 ## Current support tiers
@@ -33,7 +33,8 @@ Pedals that already enumerate as an ordinary keyboard can trigger Windows shortc
 
 - **Run once when pressed** for scene changes, application commands, text, mouse clicks, and timed sequences.
 - **Hold keys/buttons until released** for push-to-talk, game movement, momentary playback, and similar controls.
-- **Run once when released** for workflows where lifting the foot should perform the action.
+- **Independent release action** for workflows where lifting the foot should perform a second command. Older release-only bindings migrate automatically.
+- **Momentary shift layer** to use another bank only while its owner switch remains physically held.
 
 Timed recordings are closed with matching key-up steps if recording stops while a key is still held. One-shot playback also performs a final release pass after completion, cancellation, or failure.
 
@@ -46,13 +47,12 @@ Timed recordings are closed with matching key-up steps if recording stops while 
 
 ## Next compatibility milestones
 
-1. Export/import individual learned-device definitions and maintain a reviewed community device library with VID/PID, descriptor hash, report samples, switch count, and verification status.
+1. Export/import individual learned-device definitions and extend the reviewed community registry with descriptor hashes, report samples, switch counts, and hardware verification results.
 2. Improve the armed idle-baseline learning flow with multiple press/release samples, volatile-byte masking, and a simultaneous-button validation step.
-3. Add foreground-application profiles resolved only when a pedal is pressed, avoiding a continuous process-monitoring loop.
-4. Add separate press and release assignments, a momentary shift layer, repeat-while-held, toggle, long-press, and double-tap behaviors with explicit conflict rules.
-5. Add purpose-built adapters for popular Olympus, Philips, vPedal, and other USB transcription controls as hardware reports are verified.
-6. Add a Windows Raw Input provider for device-specific remapping of pedals that present as keyboards.
-7. Move action routing fully off the UI dispatcher and maintain press-to-output latency measurements in automated hardware tests.
+3. Add repeat-while-held, toggle, long-press, and double-tap behaviors with explicit conflict rules.
+4. Add purpose-built adapters for popular Olympus, Philips, vPedal, and other USB transcription controls as hardware reports are verified.
+5. Add a Windows Raw Input provider for device-specific remapping of pedals that present as keyboards.
+6. Move action routing fully off the UI dispatcher and maintain press-to-output latency measurements in automated hardware tests.
 
 ## Performance targets
 

@@ -18,7 +18,7 @@ public enum PedalLayoutMode
 public sealed class AppProfile
 {
     public const int MaxBanks = 3;
-    public int SchemaVersion { get; set; } = 4;
+    public int SchemaVersion { get; set; } = 5;
     public string Name { get; set; } = "Default";
     public AppTheme Theme { get; set; } = AppTheme.Dark;
     public int ActiveBankIndex { get; set; }
@@ -29,11 +29,12 @@ public sealed class AppProfile
     public string SelectedTabbedDeviceKey { get; set; } = string.Empty;
     public List<PedalDeviceProfile> Devices { get; set; } = [];
     public List<LearnedPedalDefinition> LearnedPedals { get; set; } = [];
+    public List<ApplicationProfileRule> ApplicationProfiles { get; set; } = [];
 
     public void Normalize()
     {
         var previousSchema = SchemaVersion;
-        SchemaVersion = 4;
+        SchemaVersion = 5;
         Name = string.IsNullOrWhiteSpace(Name) ? "Default" : Name.Trim();
         ActiveBankIndex = Math.Clamp(ActiveBankIndex, 0, MaxBanks - 1);
         BankHotkey = string.IsNullOrWhiteSpace(BankHotkey) ? "Ctrl+Alt+B" : BankHotkey.Trim();
@@ -41,9 +42,14 @@ public sealed class AppProfile
         SelectedTabbedDeviceKey = SelectedTabbedDeviceKey?.Trim() ?? string.Empty;
         Devices ??= [];
         LearnedPedals ??= [];
+        ApplicationProfiles ??= [];
         foreach (var learned in LearnedPedals)
         {
             learned.Normalize();
+        }
+        foreach (var applicationProfile in ApplicationProfiles)
+        {
+            applicationProfile.Normalize();
         }
         foreach (var device in Devices)
         {

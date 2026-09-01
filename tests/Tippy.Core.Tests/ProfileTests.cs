@@ -64,7 +64,7 @@ public sealed class ProfileTests
 
         var loaded = new ProfileSerializer().Deserialize(json);
 
-        Assert.Equal(4, loaded.SchemaVersion);
+        Assert.Equal(5, loaded.SchemaVersion);
         Assert.All(loaded.Devices, device => Assert.Equal(2, device.ActiveBankIndex));
     }
 
@@ -89,18 +89,27 @@ public sealed class ProfileTests
     }
 
     [Fact]
-    public void ReleaseOnceTriggerRoundTrips()
+    public void LegacyReleaseOnceTriggerMigratesToDedicatedReleaseAction()
     {
         var profile = new AppProfile();
         var device = PedalDeviceProfile.Create("dev", "Pedal", 1, 2);
+        device.Banks[0].Bindings[0].Macro.Name = "Stop recording";
         device.Banks[0].Bindings[0].Macro.TriggerMode = MacroTriggerMode.ReleaseOnce;
+        device.Banks[0].Bindings[0].Macro.Steps.Add(new MacroStep
+        {
+            Type = MacroStepType.KeyChord,
+            Keys = ["Ctrl", "F10"]
+        });
         profile.Devices.Add(device);
 
         var serializer = new ProfileSerializer();
         var loaded = serializer.Deserialize(serializer.Serialize(profile));
 
-        Assert.Equal(MacroTriggerMode.ReleaseOnce,
-            loaded.Devices[0].Banks[0].Bindings[0].Macro.TriggerMode);
+        var binding = loaded.Devices[0].Banks[0].Bindings[0];
+        Assert.Empty(binding.Macro.Steps);
+        Assert.Equal(MacroTriggerMode.ReleaseOnce, binding.ReleaseMacro.TriggerMode);
+        Assert.Equal("Stop recording", binding.ReleaseMacro.Name);
+        Assert.Equal(["Ctrl", "F10"], binding.ReleaseMacro.Steps[0].Keys);
     }
 
     [Fact]
@@ -144,7 +153,7 @@ public sealed class ProfileTests
         var serializer = new ProfileSerializer();
         var loaded = serializer.Deserialize(serializer.Serialize(profile));
 
-        Assert.Equal(4, loaded.SchemaVersion);
+        Assert.Equal(5, loaded.SchemaVersion);
         var learned = Assert.Single(loaded.LearnedPedals);
         Assert.Equal("Custom pedal", learned.Name);
         Assert.Equal(3, learned.Switches.Count);
@@ -176,5 +185,62 @@ public sealed class ProfileTests
         Assert.True(first.MatchesHardwareIdentity(renamed));
         Assert.False(first.MatchesHardwareIdentity(changedDescriptor));
         Assert.True(first.MatchesHardwareIdentity(legacy));
+    }
+
+    [Fact]
+    public void ProfileRoundTripsDualEdgeProgramAndShiftAssignments()
+    {
+        var profile = new AppProfile();
+        var device = PedalDeviceProfile.Create("dev", "Pedal", 1, 2);
+        var dual = device.Banks[0].Bindings[0];
+        dual.Macro.Name = "Open tool";
+        dual.Macro.Steps.Add(new MacroStep
+        {
+            Type = MacroStepType.LaunchProgram,
+            Value = @"C:\Tools\Tool.exe",
+            Arguments = "--quiet",
+            WorkingDirectory = @"C:\Tools"
+        });
+        dual.ReleaseMacro.Name = "Confirm";
+        dual.ReleaseMacro.Steps.Add(new MacroStep { Type = MacroStepType.KeyChord, Keys = ["Enter"] });
+        var shift = device.Banks[0].Bindings[1];
+        shift.Type = PedalBindingType.ShiftLayer;
+        shift.ShiftBankIndex = 2;
+        profile.Devices.Add(device);
+
+        var loaded = new ProfileSerializer().Deserialize(new ProfileSerializer().Serialize(profile));
+        var loadedDual = loaded.Devices[0].Banks[0].Bindings[0];
+        var loadedProgram = Assert.Single(loadedDual.Macro.Steps);
+
+        Assert.Equal(MacroStepType.LaunchProgram, loadedProgram.Type);
+        Assert.Equal("--quiet", loadedProgram.Arguments);
+        Assert.Equal(@"C:\Tools", loadedProgram.WorkingDirectory);
+        Assert.Equal(["Enter"], Assert.Single(loadedDual.ReleaseMacro.Steps).Keys);
+        Assert.Equal(MacroTriggerMode.ReleaseOnce, loadedDual.ReleaseMacro.TriggerMode);
+        Assert.Equal(PedalBindingType.ShiftLayer, loaded.Devices[0].Banks[0].Bindings[1].Type);
+        Assert.Equal(2, loaded.Devices[0].Banks[0].Bindings[1].ShiftBankIndex);
+    }
+
+    [Fact]
+    public void ApplicationProfilesRoundTripAndMatchByPathOrProcess()
+    {
+        var profile = new AppProfile();
+        profile.ApplicationProfiles.Add(new ApplicationProfileRule
+        {
+            Name = "OBS production",
+            ProcessName = "obs64.exe",
+            ExecutablePath = @"C:\OBS\bin\64bit\obs64.exe",
+            DeviceBanks = [new ApplicationDeviceBank { DeviceKey = "left", BankIndex = 2 }]
+        });
+
+        var loaded = new ProfileSerializer().Deserialize(new ProfileSerializer().Serialize(profile));
+        var rule = Assert.Single(loaded.ApplicationProfiles);
+
+        Assert.Equal("obs64", rule.ProcessName);
+        Assert.True(rule.Matches("obs64", @"C:\Other\obs64.exe"));
+        Assert.True(rule.Matches("anything", @"C:\OBS\bin\64bit\obs64.exe"));
+        Assert.False(rule.Matches("blender", @"C:\Blender\blender.exe"));
+        Assert.Equal(2, rule.GetBankIndex("left", 0));
+        Assert.Equal(1, rule.GetBankIndex("right", 1));
     }
 }

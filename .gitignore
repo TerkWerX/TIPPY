@@ -17,6 +17,7 @@ artifacts/
 # Local tooling and diagnostics
 .codex-temp/
 *.log
+Claude/rejected_angled/
 
 # OS metadata
 Thumbs.db

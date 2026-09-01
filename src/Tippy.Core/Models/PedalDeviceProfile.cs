@@ -7,6 +7,7 @@ public sealed class PedalDeviceProfile
     public int VendorId { get; set; }
     public int ProductId { get; set; }
     public int SwitchCount { get; set; } = 3;
+    public string ArtworkKey { get; set; } = string.Empty;
     public int ActiveBankIndex { get; set; }
     public List<PedalBank> Banks { get; set; } = [];
 
@@ -32,6 +33,7 @@ public sealed class PedalDeviceProfile
     public void Normalize()
     {
         SwitchCount = Math.Clamp(SwitchCount, 1, 32);
+        ArtworkKey = ArtworkKey?.Trim() ?? string.Empty;
         ActiveBankIndex = Math.Clamp(ActiveBankIndex, 0, AppProfile.MaxBanks - 1);
         Banks ??= [];
         while (Banks.Count < AppProfile.MaxBanks)

@@ -24,6 +24,7 @@ public sealed class PedalHidService : IDisposable
     public event EventHandler<PedalConnectionEventArgs>? ConnectionChanged;
     public event EventHandler<PedalStateEventArgs>? StateChanged;
     public event EventHandler<string>? Diagnostic;
+    public event EventHandler? ScanCompleted;
 
     public IReadOnlyCollection<PedalDeviceInfo> ConnectedDevices =>
         _readers.Values.Select(reader => reader.Info).ToArray();
@@ -124,7 +125,8 @@ public sealed class PedalHidService : IDisposable
                     device.ProductID,
                     device.DevicePath,
                     decoder.Name,
-                    switchCount);
+                    switchCount,
+                    SafeGet(() => device.GetManufacturer(), string.Empty));
                 var reader = new DeviceReader(device, info, decoder, OnStateChanged, OnReaderStopped);
                 if (!_readers.TryAdd(key, reader))
                 {
@@ -163,6 +165,7 @@ public sealed class PedalHidService : IDisposable
         finally
         {
             Interlocked.Exchange(ref _scanning, 0);
+            ScanCompleted?.Invoke(this, EventArgs.Empty);
             if (Interlocked.Exchange(ref _rescanRequested, 0) != 0 && !_stopping.IsCancellationRequested)
             {
                 _ = ScanAsync();

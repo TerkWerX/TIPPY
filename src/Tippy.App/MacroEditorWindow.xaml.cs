@@ -1,5 +1,6 @@
 using System.ComponentModel;
 using System.Diagnostics;
+using Microsoft.Win32;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Data;
@@ -13,6 +14,7 @@ namespace Tippy.App;
 public partial class MacroEditorWindow : Window
 {
     private readonly PedalBinding _working;
+    private readonly bool _releaseOnly;
     private readonly IReadOnlyList<KnownWindowsAction> _knownActions = WindowsActionCatalog.Create();
     private readonly IReadOnlyList<ApplicationShortcutProfile> _applications = ApplicationShortcutCatalog.Create();
     private readonly Stopwatch _recordingClock = new();
@@ -25,16 +27,23 @@ public partial class MacroEditorWindow : Window
     private bool _recording;
     private long _lastRecordedMilliseconds;
 
-    public MacroEditorWindow(PedalBinding source)
+    public MacroEditorWindow(PedalBinding source) : this(source, false)
     {
-        InitializeComponent();
+    }
+
+    private MacroEditorWindow(PedalBinding source, bool releaseOnly)
+    {
+        _releaseOnly = releaseOnly;
         _working = source.Clone();
+        _working.Normalize();
         Result = source.Clone();
+        InitializeComponent();
         Loaded += (_, _) =>
         {
             BindingTypeBox.SelectedIndex = (int)_working.Type;
-            TriggerModeBox.SelectedIndex = (int)_working.Macro.TriggerMode;
-            NameBox.Text = _working.Macro.Name;
+            TriggerModeBox.SelectedIndex = CurrentMacro.TriggerMode == MacroTriggerMode.WhileHeld ? 1 : 0;
+            ShiftBankBox.SelectedIndex = _working.ShiftBankIndex;
+            NameBox.Text = CurrentMacro.Name;
             ActionsList.ItemsSource = _knownActions;
             _actionsView = CollectionViewSource.GetDefaultView(ActionsList.ItemsSource);
             ActionsList.SelectedIndex = 0;
@@ -44,7 +53,16 @@ public partial class MacroEditorWindow : Window
             ApplicationsList.SelectedIndex = 0;
             UpdateApplicationCount();
             RefreshSteps();
+            RefreshReleaseSummary();
             UpdateMacroVisibility();
+            if (_releaseOnly)
+            {
+                AssignmentHeading.Text = "Release action";
+                AssignmentSubtitle.Text = "Build the action that runs when this switch is released.";
+                BindingTypePanel.Visibility = Visibility.Collapsed;
+                TriggerModePanel.Visibility = Visibility.Collapsed;
+                ReleaseActionBorder.Visibility = Visibility.Collapsed;
+            }
         };
         PreviewKeyDown += MacroEditorWindow_PreviewKeyDown;
         PreviewKeyUp += MacroEditorWindow_PreviewKeyUp;
@@ -52,15 +70,25 @@ public partial class MacroEditorWindow : Window
 
     public PedalBinding Result { get; private set; }
 
+    private MacroDefinition CurrentMacro => _releaseOnly ? _working.ReleaseMacro : _working.Macro;
+
     private void BindingTypeBox_SelectionChanged(object sender, SelectionChangedEventArgs e) => UpdateMacroVisibility();
 
     private void UpdateMacroVisibility()
     {
         if (MacroArea is null) return;
-        var isMacro = SelectedBindingType() == PedalBindingType.Macro;
+        var type = _releaseOnly ? PedalBindingType.Macro : SelectedBindingType();
+        var isMacro = type == PedalBindingType.Macro;
         MacroArea.IsEnabled = isMacro;
-        TriggerModeBox.IsEnabled = isMacro;
+        TriggerModeBox.IsEnabled = isMacro && !_releaseOnly;
         MacroArea.Opacity = isMacro ? 1 : 0.45;
+        ShiftBankPanel.Visibility = !_releaseOnly && type == PedalBindingType.ShiftLayer
+            ? Visibility.Visible
+            : Visibility.Collapsed;
+        if (!_releaseOnly)
+        {
+            ReleaseActionBorder.Visibility = isMacro ? Visibility.Visible : Visibility.Collapsed;
+        }
     }
 
     private void CaptureShortcut_Click(object sender, RoutedEventArgs e)
@@ -99,8 +127,8 @@ public partial class MacroEditorWindow : Window
             var key = e.Key == Key.System ? e.SystemKey : e.Key;
             var shortcut = ShortcutFormatter.FromKey(key, Keyboard.Modifiers, false);
             var keys = shortcut.Split('+', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries).ToList();
-            _working.Macro.Steps.Add(new MacroStep { Type = MacroStepType.KeyChord, Keys = keys, DurationMs = 25 });
-            RefreshSteps(_working.Macro.Steps.Count - 1);
+            CurrentMacro.Steps.Add(new MacroStep { Type = MacroStepType.KeyChord, Keys = keys, DurationMs = 25 });
+            RefreshSteps(CurrentMacro.Steps.Count - 1);
             EndCapture($"Added {shortcut}");
         }
         catch (Exception exception)
@@ -142,11 +170,11 @@ public partial class MacroEditorWindow : Window
         if (keyName is null) return;
         var now = _recordingClock.ElapsedMilliseconds;
         var delay = (int)Math.Clamp(now - _lastRecordedMilliseconds, 0, 60_000);
-        if (_working.Macro.Steps.Count > 0 && delay > 0)
-            _working.Macro.Steps.Add(new MacroStep { Type = MacroStepType.Delay, DurationMs = delay });
-        _working.Macro.Steps.Add(new MacroStep { Type = type, Keys = [keyName] });
+        if (CurrentMacro.Steps.Count > 0 && delay > 0)
+            CurrentMacro.Steps.Add(new MacroStep { Type = MacroStepType.Delay, DurationMs = delay });
+        CurrentMacro.Steps.Add(new MacroStep { Type = type, Keys = [keyName] });
         _lastRecordedMilliseconds = now;
-        RefreshSteps(_working.Macro.Steps.Count - 1);
+        RefreshSteps(CurrentMacro.Steps.Count - 1);
     }
 
     private void StopRecording(string message)
@@ -189,10 +217,10 @@ public partial class MacroEditorWindow : Window
     {
         if (ActionsList.SelectedItem is not KnownWindowsAction action) return;
         _working.Type = PedalBindingType.Macro;
-        _working.Macro.Name = action.Name;
-        _working.Macro.TriggerMode = MacroTriggerMode.PressOnce;
-        _working.Macro.Steps.Clear();
-        _working.Macro.Steps.Add(new MacroStep { Type = MacroStepType.KeyChord, Keys = action.Keys.ToList(), DurationMs = 25 });
+        CurrentMacro.Name = action.Name;
+        CurrentMacro.TriggerMode = _releaseOnly ? MacroTriggerMode.ReleaseOnce : MacroTriggerMode.PressOnce;
+        CurrentMacro.Steps.Clear();
+        CurrentMacro.Steps.Add(new MacroStep { Type = MacroStepType.KeyChord, Keys = action.Keys.ToList(), DurationMs = 25 });
         BindingTypeBox.SelectedIndex = (int)PedalBindingType.Macro;
         TriggerModeBox.SelectedIndex = (int)MacroTriggerMode.PressOnce;
         NameBox.Text = action.Name;
@@ -274,13 +302,13 @@ public partial class MacroEditorWindow : Window
     {
         if (_selectedApplication is null || ApplicationShortcutsList.SelectedItem is not ApplicationShortcut shortcut) return;
         _working.Type = PedalBindingType.Macro;
-        _working.Macro.Name = $"{_selectedApplication.Name}: {shortcut.Name}";
-        _working.Macro.TriggerMode = MacroTriggerMode.PressOnce;
-        _working.Macro.Steps.Clear();
-        _working.Macro.Steps.Add(new MacroStep { Type = MacroStepType.KeyChord, Keys = shortcut.Keys.ToList(), DurationMs = 25 });
+        CurrentMacro.Name = $"{_selectedApplication.Name}: {shortcut.Name}";
+        CurrentMacro.TriggerMode = _releaseOnly ? MacroTriggerMode.ReleaseOnce : MacroTriggerMode.PressOnce;
+        CurrentMacro.Steps.Clear();
+        CurrentMacro.Steps.Add(new MacroStep { Type = MacroStepType.KeyChord, Keys = shortcut.Keys.ToList(), DurationMs = 25 });
         BindingTypeBox.SelectedIndex = (int)PedalBindingType.Macro;
         TriggerModeBox.SelectedIndex = (int)MacroTriggerMode.PressOnce;
-        NameBox.Text = _working.Macro.Name;
+        NameBox.Text = CurrentMacro.Name;
         RefreshSteps(0);
         MacroArea.SelectedIndex = 2;
         CaptureHint.Text = $"Assigned {_selectedApplication.Name} · {shortcut.Name} ({shortcut.Shortcut}).";
@@ -289,17 +317,17 @@ public partial class MacroEditorWindow : Window
     private void AddString_Click(object sender, RoutedEventArgs e)
     {
         if (string.IsNullOrEmpty(TextStringBox.Text)) return;
-        _working.Macro.Steps.Add(new MacroStep { Type = MacroStepType.Text, Value = TextStringBox.Text });
+        CurrentMacro.Steps.Add(new MacroStep { Type = MacroStepType.Text, Value = TextStringBox.Text });
         TextStringBox.Clear();
-        RefreshSteps(_working.Macro.Steps.Count - 1);
+        RefreshSteps(CurrentMacro.Steps.Count - 1);
     }
 
     private void AddText_Click(object sender, RoutedEventArgs e)
     {
         var value = PromptDialog.Ask(this, "Type text", "Text to type", string.Empty);
         if (value is null) return;
-        _working.Macro.Steps.Add(new MacroStep { Type = MacroStepType.Text, Value = value });
-        RefreshSteps(_working.Macro.Steps.Count - 1);
+        CurrentMacro.Steps.Add(new MacroStep { Type = MacroStepType.Text, Value = value });
+        RefreshSteps(CurrentMacro.Steps.Count - 1);
     }
 
     private void AddDelay_Click(object sender, RoutedEventArgs e)
@@ -311,8 +339,8 @@ public partial class MacroEditorWindow : Window
             MessageBox.Show(this, "Enter a whole number from 0 to 60000.", "Delay", MessageBoxButton.OK, MessageBoxImage.Warning);
             return;
         }
-        _working.Macro.Steps.Add(new MacroStep { Type = MacroStepType.Delay, DurationMs = milliseconds });
-        RefreshSteps(_working.Macro.Steps.Count - 1);
+        CurrentMacro.Steps.Add(new MacroStep { Type = MacroStepType.Delay, DurationMs = milliseconds });
+        RefreshSteps(CurrentMacro.Steps.Count - 1);
     }
 
     private void AddMouse_Click(object sender, RoutedEventArgs e)
@@ -326,8 +354,8 @@ public partial class MacroEditorWindow : Window
             "Wheel down" => new MacroStep { Type = MacroStepType.MouseWheel, Amount = -120 },
             _ => new MacroStep { Type = MacroStepType.MouseButton, Value = choice.Replace(" click", string.Empty) }
         };
-        _working.Macro.Steps.Add(step);
-        RefreshSteps(_working.Macro.Steps.Count - 1);
+        CurrentMacro.Steps.Add(step);
+        RefreshSteps(CurrentMacro.Steps.Count - 1);
     }
 
     private void AddGamepad_Click(object sender, RoutedEventArgs e)
@@ -335,8 +363,62 @@ public partial class MacroEditorWindow : Window
         var choice = PromptDialog.Choose(this, "Gamepad button", "Virtual Xbox 360 button",
             ["A", "B", "X", "Y", "LB", "RB", "Back", "Start", "L3", "R3", "DPad Up", "DPad Down", "DPad Left", "DPad Right"]);
         if (choice is null) return;
-        _working.Macro.Steps.Add(new MacroStep { Type = MacroStepType.GamepadButton, Value = choice, DurationMs = 25 });
-        RefreshSteps(_working.Macro.Steps.Count - 1);
+        CurrentMacro.Steps.Add(new MacroStep { Type = MacroStepType.GamepadButton, Value = choice, DurationMs = 25 });
+        RefreshSteps(CurrentMacro.Steps.Count - 1);
+    }
+
+    private void AddProgram_Click(object sender, RoutedEventArgs e)
+    {
+        var dialog = new OpenFileDialog
+        {
+            Title = "Choose a program, script, or shortcut",
+            Filter = "Programs and scripts (*.exe;*.com;*.bat;*.cmd;*.lnk)|*.exe;*.com;*.bat;*.cmd;*.lnk|All files (*.*)|*.*"
+        };
+        if (dialog.ShowDialog(this) != true) return;
+        var arguments = PromptDialog.Ask(this, "Program arguments",
+            "Optional command-line arguments (leave blank for none)", string.Empty);
+        if (arguments is null) return;
+        CurrentMacro.Steps.Add(new MacroStep
+        {
+            Type = MacroStepType.LaunchProgram,
+            Value = dialog.FileName,
+            Arguments = arguments,
+            WorkingDirectory = Path.GetDirectoryName(dialog.FileName)
+        });
+        RefreshSteps(CurrentMacro.Steps.Count - 1);
+    }
+
+    private void EditReleaseAction_Click(object sender, RoutedEventArgs e)
+    {
+        _working.Macro.Name = string.IsNullOrWhiteSpace(NameBox.Text) ? "Unnamed macro" : NameBox.Text.Trim();
+        var editor = new MacroEditorWindow(_working, true)
+        {
+            Owner = this,
+            Title = $"Release action · {Title}"
+        };
+        if (editor.ShowDialog() != true) return;
+        _working.ReleaseMacro = editor.Result.ReleaseMacro.Clone();
+        RefreshReleaseSummary();
+    }
+
+    private void ClearReleaseAction_Click(object sender, RoutedEventArgs e)
+    {
+        _working.ReleaseMacro = new MacroDefinition
+        {
+            Name = "On release",
+            TriggerMode = MacroTriggerMode.ReleaseOnce
+        };
+        RefreshReleaseSummary();
+    }
+
+    private void RefreshReleaseSummary()
+    {
+        if (ReleaseActionSummary is null) return;
+        var hasAction = _working.ReleaseMacro.Steps.Count > 0;
+        ReleaseActionSummary.Text = hasAction
+            ? $"{_working.ReleaseMacro.Name} · {_working.ReleaseMacro.Summary}"
+            : "No action when released";
+        ClearReleaseButton.IsEnabled = hasAction;
     }
 
     private void MoveUp_Click(object sender, RoutedEventArgs e) => MoveSelected(-1);
@@ -346,8 +428,8 @@ public partial class MacroEditorWindow : Window
     {
         var current = StepsList.SelectedIndex;
         var target = current + direction;
-        if (current < 0 || target < 0 || target >= _working.Macro.Steps.Count) return;
-        (_working.Macro.Steps[current], _working.Macro.Steps[target]) = (_working.Macro.Steps[target], _working.Macro.Steps[current]);
+        if (current < 0 || target < 0 || target >= CurrentMacro.Steps.Count) return;
+        (CurrentMacro.Steps[current], CurrentMacro.Steps[target]) = (CurrentMacro.Steps[target], CurrentMacro.Steps[current]);
         RefreshSteps(target);
     }
 
@@ -355,18 +437,18 @@ public partial class MacroEditorWindow : Window
     {
         var index = StepsList.SelectedIndex;
         if (index < 0) return;
-        _working.Macro.Steps.RemoveAt(index);
-        RefreshSteps(Math.Min(index, _working.Macro.Steps.Count - 1));
+        CurrentMacro.Steps.RemoveAt(index);
+        RefreshSteps(Math.Min(index, CurrentMacro.Steps.Count - 1));
     }
 
     private void RefreshSteps(int selectedIndex = -1)
     {
         StepsList.Items.Clear();
-        for (var index = 0; index < _working.Macro.Steps.Count; index++)
+        for (var index = 0; index < CurrentMacro.Steps.Count; index++)
         {
             StepsList.Items.Add(new ListBoxItem
             {
-                Content = $"{index + 1}.   {_working.Macro.Steps[index].ToSummary()}",
+                Content = $"{index + 1}.   {CurrentMacro.Steps[index].ToSummary()}",
                 Padding = new Thickness(10, 8, 10, 8)
             });
         }
@@ -382,23 +464,38 @@ public partial class MacroEditorWindow : Window
 
     private void Save_Click(object sender, RoutedEventArgs e)
     {
-        _working.Type = SelectedBindingType();
-        _working.Macro.Name = string.IsNullOrWhiteSpace(NameBox.Text) ? "Unnamed macro" : NameBox.Text.Trim();
-        _working.Macro.TriggerMode = SelectedTriggerMode();
-        if (_working.Type == PedalBindingType.Macro && _working.Macro.Steps.Count == 0)
+        CurrentMacro.Name = string.IsNullOrWhiteSpace(NameBox.Text) ? "Unnamed macro" : NameBox.Text.Trim();
+        if (_releaseOnly)
         {
-            if (MessageBox.Show(this, "This macro has no steps. Save it anyway?", "Empty macro",
+            CurrentMacro.TriggerMode = MacroTriggerMode.ReleaseOnce;
+            if (CurrentMacro.Steps.Count == 0 && MessageBox.Show(this,
+                    "This release action has no steps. Save it anyway?", "Empty release action",
                     MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes) return;
+            Result = _working.Clone();
+            DialogResult = true;
+            return;
+        }
+
+        _working.Type = SelectedBindingType();
+        _working.ShiftBankIndex = Math.Clamp(ShiftBankBox.SelectedIndex, 0, AppProfile.MaxBanks - 1);
+        _working.Macro.TriggerMode = SelectedTriggerMode();
+        if (_working.Type == PedalBindingType.Macro &&
+            _working.Macro.Steps.Count == 0 && _working.ReleaseMacro.Steps.Count == 0 &&
+            MessageBox.Show(this, "This switch has no press or release steps. Save it anyway?", "Empty assignment",
+                MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes)
+        {
+            return;
         }
         if (_working.Type == PedalBindingType.Macro &&
             _working.Macro.TriggerMode == MacroTriggerMode.WhileHeld &&
             _working.Macro.Steps.Any(step => step.Type is not (MacroStepType.KeyChord or MacroStepType.KeyDown or MacroStepType.GamepadButton)))
         {
             MessageBox.Show(this,
-                "Hold-until-release macros can contain only keyboard shortcuts and gamepad buttons. Remove text, wait, mouse, and wheel steps, or choose Run once.",
+                "Hold-until-release press actions can contain only keyboard shortcuts and gamepad buttons. Remove text, wait, mouse, program, and wheel steps, or choose Run once.",
                 "Hold macro", MessageBoxButton.OK, MessageBoxImage.Warning);
             return;
         }
+        _working.Normalize();
         Result = _working.Clone();
         DialogResult = true;
     }
@@ -408,6 +505,7 @@ public partial class MacroEditorWindow : Window
             ? type : PedalBindingType.Macro;
 
     private MacroTriggerMode SelectedTriggerMode() =>
+        _releaseOnly ? MacroTriggerMode.ReleaseOnce :
         Enum.TryParse<MacroTriggerMode>((TriggerModeBox.SelectedItem as ComboBoxItem)?.Tag?.ToString(), out var mode)
             ? mode : MacroTriggerMode.PressOnce;
 }

@@ -7,7 +7,8 @@ public sealed record PedalDeviceInfo(
     int ProductId,
     string DevicePath,
     string DecoderName,
-    int SwitchCount = 3)
+    int SwitchCount = 3,
+    string Manufacturer = "")
 {
     public string VidPid => $"VID_{VendorId:X4}  PID_{ProductId:X4}";
 }

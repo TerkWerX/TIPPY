@@ -38,6 +38,7 @@
                 <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
                     <Button Content="Open profile" Click="OpenProfile_Click" Margin="0,0,8,0"/>
                     <Button Content="Save as" Click="SaveProfile_Click" Margin="0,0,8,0"/>
+                    <Button Content="App profiles" Click="ApplicationProfiles_Click" Margin="0,0,8,0"/>
                     <Button Content="Settings" Click="Settings_Click" Margin="0,0,8,0"/>
                     <Button Content="To tray" Click="MinimizeToTray_Click" Margin="0,0,8,0" ToolTip="Keep Tippy running in the notification area"/>
                     <Button Content="Help" Click="Help_Click" Margin="0,0,8,0"/>

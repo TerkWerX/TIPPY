@@ -9,7 +9,8 @@ public enum MacroStepType
     MouseButton,
     MouseWheel,
     Delay,
-    GamepadButton
+    GamepadButton,
+    LaunchProgram
 }
 
 public sealed class MacroStep
@@ -19,6 +20,8 @@ public sealed class MacroStep
     public string? Value { get; set; }
     public int DurationMs { get; set; } = 25;
     public int Amount { get; set; }
+    public string? Arguments { get; set; }
+    public string? WorkingDirectory { get; set; }
 
     public MacroStep Clone() => new()
     {
@@ -26,7 +29,9 @@ public sealed class MacroStep
         Keys = [.. Keys],
         Value = Value,
         DurationMs = DurationMs,
-        Amount = Amount
+        Amount = Amount,
+        Arguments = Arguments,
+        WorkingDirectory = WorkingDirectory
     };
 
     public string ToSummary() => Type switch
@@ -39,6 +44,7 @@ public sealed class MacroStep
         MacroStepType.MouseWheel => $"Wheel {(Amount >= 0 ? "+" : string.Empty)}{Amount}",
         MacroStepType.Delay => $"Wait {Math.Clamp(DurationMs, 0, 60_000)} ms",
         MacroStepType.GamepadButton => $"Gamepad {Value ?? "A"}",
+        MacroStepType.LaunchProgram => $"Run {Path.GetFileName(Value) ?? "program"}",
         _ => Type.ToString()
     };
 
