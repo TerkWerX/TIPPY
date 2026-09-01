@@ -6,6 +6,7 @@ Notable changes to Tippy are documented here.
 
 ### Added
 
+- Sub-compact ¼ view with exact quarter-scale pedal artwork, a 210×180 pedal-only window, unlabeled live press illumination, dot-based multi-pedal selection, automatic pressed-pedal focus, and a single full-view return control.
 - A clearly labeled, profile-persistent Compact view independent of pedal layout, with pedal-only chrome, full-size artwork, multi-pedal tabs, essential bank/edit controls, and Full view/Esc/F11 escape paths.
 - Selectable per-profile Windows MIDI outputs, live note-on/note-off device testing, explicit note-off messages, strict MIDI value validation, endpoint reconnect handling, and accurate WinMM error reporting.
 - Five-second branded splash presentation with a white Tippy title and `by TerkWerX.com © 2026` credit.

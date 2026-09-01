@@ -1,8 +1,10 @@
 using System.Windows;
+using System.Windows.Automation;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
+using System.Windows.Shapes;
 using Microsoft.Win32;
 using Tippy.App.Models;
 using Tippy.App.Services;
@@ -123,12 +125,12 @@ public partial class MainWindow : Window
             WindowState = WindowState.Maximized;
             _windowStateBeforeTray = WindowState.Maximized;
         }
-        if (_profile.WindowPlacement.HasPlacement)
+        if (_profile.WindowPlacement.HasPlacement && !_profile.IsSubCompactMode)
             _lastOptimizationKey = GetWindowOptimizationKey();
         RememberWindowPlacement();
         ScheduleSave();
         BuildBankButtons();
-        RefreshDevices();
+        RefreshDevices(_profile.IsSubCompactMode);
         UpdateHeader();
         RegisterHotkeys();
         _hid.ConfigureLearnedDevices(_profile.LearnedPedals);
@@ -223,6 +225,13 @@ public partial class MainWindow : Window
             RawReportText.Text = $"{e.Device.DisplayName}: {Convert.ToHexString(e.RawReport)}";
             if (e.IsPressed) _pressedSwitches.Add(key);
             else _pressedSwitches.Remove(key);
+            if (e.IsPressed && _profile.IsSubCompactMode &&
+                !e.Device.DeviceKey.Equals(_profile.SelectedTabbedDeviceKey, StringComparison.OrdinalIgnoreCase))
+            {
+                _profile.SelectedTabbedDeviceKey = e.Device.DeviceKey;
+                RefreshDevices();
+                ScheduleSave();
+            }
             UpdatePressedVisual(key, e.IsPressed);
 
             if (!e.IsPressed)
@@ -461,11 +470,17 @@ public partial class MainWindow : Window
         DevicesPanel.ColumnDefinitions.Clear();
         _switchTiles.Clear();
         _pedalTabHeaders.Clear();
+        SubCompactPedalHost.Children.Clear();
+        SubCompactDotsPanel.Children.Clear();
         EmptyState.Visibility = _profile.Devices.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
         var count = _profile.Devices.Count;
 
         ApplyLayoutChrome();
-        if (UsesTabbedPedalPresentation() && count > 0)
+        if (_profile.IsSubCompactMode && count > 0)
+        {
+            BuildSubCompactDeviceLayout();
+        }
+        else if (UsesTabbedPedalPresentation() && count > 0)
         {
             BuildTabbedDeviceLayout();
         }
@@ -474,6 +489,7 @@ public partial class MainWindow : Window
             BuildGridDeviceLayout();
         }
 
+        foreach (var pressed in _pressedSwitches) UpdatePressedVisual(pressed, true);
         StatusDot.Fill = (Brush)FindResource(_connected.Count > 0 ? "SuccessBrush" : "MutedTextBrush");
         if (optimizeWindow) OptimizeWindowForPedals();
     }
@@ -545,6 +561,43 @@ public partial class MainWindow : Window
             _profile.SelectedTabbedDeviceKey = key;
         _buildingTabbedLayout = false;
         DevicesPanel.Children.Add(tabs);
+    }
+
+    private void BuildSubCompactDeviceLayout()
+    {
+        var selectedIndex = _profile.Devices.FindIndex(device =>
+            device.DeviceKey.Equals(_profile.SelectedTabbedDeviceKey, StringComparison.OrdinalIgnoreCase));
+        if (selectedIndex < 0)
+            selectedIndex = _profile.Devices.FindIndex(device => _connected.ContainsKey(device.DeviceKey));
+        selectedIndex = Math.Max(0, selectedIndex);
+        var selected = _profile.Devices[selectedIndex];
+        _profile.SelectedTabbedDeviceKey = selected.DeviceKey;
+        SubCompactPedalHost.Children.Add(CreateSubCompactPedalVisual(selected,
+            _connected.ContainsKey(selected.DeviceKey)));
+
+        for (var index = 0; index < _profile.Devices.Count; index++)
+        {
+            var device = _profile.Devices[index];
+            var isSelected = index == selectedIndex;
+            var dot = new Border
+            {
+                Width = 15, Height = 15, Background = Brushes.Transparent,
+                Cursor = Cursors.Hand, ToolTip = device.DisplayName, Tag = "SubCompactDot",
+                Child = new Ellipse
+                {
+                    Width = isSelected ? 8 : 6, Height = isSelected ? 8 : 6,
+                    Fill = (Brush)FindResource(isSelected ? "AccentBrush" : "MutedTextBrush")
+                }
+            };
+            AutomationProperties.SetName(dot, $"Show pedal {index + 1}");
+            dot.MouseLeftButtonUp += (_, _) =>
+            {
+                _profile.SelectedTabbedDeviceKey = device.DeviceKey;
+                RefreshDevices();
+                ScheduleSave();
+            };
+            SubCompactDotsPanel.Children.Add(dot);
+        }
     }
 
     private Border CreatePedalTabHeader(PedalDeviceProfile device, bool connected)
@@ -958,6 +1011,65 @@ public partial class MainWindow : Window
         };
     }
 
+    private FrameworkElement CreateSubCompactPedalVisual(PedalDeviceProfile device, bool connected)
+    {
+        var artwork = _pedalRegistry.ResolveArtwork(device.ArtworkKey, GetDeviceInfo(device));
+        var canvas = new Grid
+        {
+            Width = 760, Height = 485,
+            Opacity = connected ? 1 : 0.58,
+            Background = artwork is null ? (Brush)FindResource("SurfaceAltBrush") : Brushes.Transparent
+        };
+        if (artwork is not null && !string.IsNullOrWhiteSpace(artwork.ImagePath))
+        {
+            try
+            {
+                var bitmap = LoadArtworkBitmap(artwork.ImagePath);
+                bitmap.Freeze();
+                canvas.Children.Add(new Image
+                {
+                    Source = bitmap, Stretch = Stretch.Uniform, SnapsToDevicePixels = true
+                });
+            }
+            catch
+            {
+                canvas.Background = (Brush)FindResource("SurfaceAltBrush");
+            }
+        }
+
+        var overlays = new Grid { Margin = new Thickness(36, 24, 36, 30) };
+        canvas.Children.Add(overlays);
+        for (var index = 0; index < device.SwitchCount; index++)
+            overlays.ColumnDefinitions.Add(new ColumnDefinition
+            {
+                Width = device.SwitchCount == 3
+                    ? new GridLength(index == 1 ? 52 : 24, GridUnitType.Star)
+                    : new GridLength(1, GridUnitType.Star)
+            });
+        for (var index = 0; index < device.SwitchCount; index++)
+        {
+            var tile = new Border
+            {
+                Background = Brushes.Transparent, BorderBrush = Brushes.Transparent,
+                BorderThickness = new Thickness(4), CornerRadius = new CornerRadius(18),
+                Margin = new Thickness(4), Opacity = connected ? 1 : 0.82
+            };
+            _switchTiles[(device.DeviceKey, index)] = tile;
+            Grid.SetColumn(tile, index);
+            overlays.Children.Add(tile);
+        }
+
+        return new Viewbox
+        {
+            Width = 190, Height = 121.25,
+            Stretch = Stretch.Uniform,
+            StretchDirection = StretchDirection.Both,
+            HorizontalAlignment = HorizontalAlignment.Center,
+            VerticalAlignment = VerticalAlignment.Center,
+            Child = canvas
+        };
+    }
+
     private FrameworkElement CreateGenericPedalVisual(PedalDeviceProfile device, bool connected, string? modelLabel = null)
     {
         var columns = Math.Min(6, Math.Max(1, (int)Math.Ceiling(Math.Sqrt(device.SwitchCount))));
@@ -1217,6 +1329,7 @@ public partial class MainWindow : Window
         menu.Items.Add(CreateToolsItem("Foot combinations & sequences", OpenFootPatterns));
         menu.Items.Add(CreateToolsItem("Live pedal diagnostics", OpenDiagnostics));
         menu.Items.Add(CreateToolsItem("MIDI output setup", OpenMidiSetup));
+        menu.Items.Add(CreateToolsItem("Sub-compact pedal view", () => SetSubCompactMode(true)));
         var rehearsal = new MenuItem { Header = "Rehearsal mode — preview without output", IsCheckable = true, IsChecked = _rehearsalMode };
         rehearsal.Click += (_, _) => SetRehearsalMode(rehearsal.IsChecked);
         menu.Items.Add(rehearsal);
@@ -1576,28 +1689,82 @@ public partial class MainWindow : Window
 
     private void CompactMode_Click(object sender, RoutedEventArgs e) => SetCompactMode(true);
 
+    private void SubCompactMode_Click(object sender, RoutedEventArgs e) => SetSubCompactMode(true);
+
     private void ExitCompactMode_Click(object sender, RoutedEventArgs e) => SetCompactMode(false);
+
+    private void ExitSubCompactMode_Click(object sender, RoutedEventArgs e) => SetFullView();
+
+    private void SubCompactSurface_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+    {
+        if (!_profile.IsSubCompactMode || e.ChangedButton != MouseButton.Left ||
+            e.OriginalSource is DependencyObject source && IsInsideSubCompactDot(source)) return;
+        try { DragMove(); } catch (InvalidOperationException) { }
+    }
+
+    private static bool IsInsideSubCompactDot(DependencyObject source)
+    {
+        for (var current = source; current is not null; current = VisualTreeHelper.GetParent(current))
+        {
+            if (current is Border { Tag: "SubCompactDot" }) return true;
+        }
+        return false;
+    }
 
     private void MainWindow_PreviewKeyDown(object sender, KeyEventArgs e)
     {
-        if (e.Key == Key.F11 || (_profile.IsCompactMode && e.Key == Key.Escape))
+        var condensed = _profile.IsCompactMode || _profile.IsSubCompactMode;
+        if (e.Key == Key.F11 || (condensed && e.Key == Key.Escape))
         {
-            SetCompactMode(!_profile.IsCompactMode);
+            if (condensed) SetFullView();
+            else SetCompactMode(true);
             e.Handled = true;
         }
     }
 
     private void SetCompactMode(bool enabled)
     {
-        if (_profile.IsCompactMode == enabled) return;
+        if (!enabled)
+        {
+            SetFullView();
+            return;
+        }
+        if (_profile.IsCompactMode && !_profile.IsSubCompactMode) return;
         if (WindowState == WindowState.Maximized) WindowState = WindowState.Normal;
-        _profile.IsCompactMode = enabled;
+        _profile.IsCompactMode = true;
+        _profile.IsSubCompactMode = false;
         _lastOptimizationKey = string.Empty;
         RefreshDevices(true);
         ScheduleSave();
-        SetStatus(enabled
-            ? "Compact pedal view active · press Esc or F11 for the full interface"
-            : "Full interface restored");
+        SetStatus("Compact pedal view active · press Esc or F11 for the full interface");
+    }
+
+    private void SetSubCompactMode(bool enabled)
+    {
+        if (!enabled)
+        {
+            SetFullView();
+            return;
+        }
+        if (_profile.IsSubCompactMode) return;
+        if (WindowState == WindowState.Maximized) WindowState = WindowState.Normal;
+        _profile.IsCompactMode = false;
+        _profile.IsSubCompactMode = true;
+        _lastOptimizationKey = string.Empty;
+        RefreshDevices(true);
+        ScheduleSave();
+        SetStatus("Sub-compact pedal view active · press Esc or F11 for the full interface");
+    }
+
+    private void SetFullView()
+    {
+        if (!_profile.IsCompactMode && !_profile.IsSubCompactMode) return;
+        _profile.IsCompactMode = false;
+        _profile.IsSubCompactMode = false;
+        _lastOptimizationKey = string.Empty;
+        RefreshDevices(true);
+        ScheduleSave();
+        SetStatus("Full interface restored");
     }
 
     private void HideToTray()
@@ -1711,13 +1878,18 @@ public partial class MainWindow : Window
     private void ApplyLayoutChrome()
     {
         var compact = _profile.IsCompactMode;
-        MinWidth = compact ? 840 : 920;
-        MinHeight = compact ? 700 : 650;
+        var subCompact = _profile.IsSubCompactMode;
+        MinWidth = subCompact ? 210 : compact ? 840 : 920;
+        MinHeight = subCompact ? 180 : compact ? 700 : 650;
+        WindowStyle = subCompact ? WindowStyle.None : WindowStyle.SingleBorderWindow;
+        ResizeMode = subCompact ? ResizeMode.NoResize : ResizeMode.CanResize;
+        SubCompactSurface.Visibility = subCompact ? Visibility.Visible : Visibility.Collapsed;
         CompactModeBar.Visibility = compact ? Visibility.Visible : Visibility.Collapsed;
-        HeaderBorder.Visibility = compact ? Visibility.Collapsed : Visibility.Visible;
-        AllPedalsBorder.Visibility = compact ? Visibility.Collapsed : Visibility.Visible;
-        DevicesToolbar.Visibility = compact ? Visibility.Collapsed : Visibility.Visible;
-        StatusBorder.Visibility = compact ? Visibility.Collapsed : Visibility.Visible;
+        HeaderBorder.Visibility = compact || subCompact ? Visibility.Collapsed : Visibility.Visible;
+        AllPedalsBorder.Visibility = compact || subCompact ? Visibility.Collapsed : Visibility.Visible;
+        DevicesScrollViewer.Visibility = subCompact ? Visibility.Collapsed : Visibility.Visible;
+        DevicesToolbar.Visibility = compact || subCompact ? Visibility.Collapsed : Visibility.Visible;
+        StatusBorder.Visibility = compact || subCompact ? Visibility.Collapsed : Visibility.Visible;
         HeaderBorder.Padding = compact ? new Thickness(12, 6, 12, 6) : new Thickness(20, 8, 20, 8);
         BrandBadge.Padding = compact ? new Thickness(6, 2, 8, 3) : new Thickness(8, 3, 10, 4);
         HeaderMascot.Width = compact ? 52 : 66;
@@ -1735,7 +1907,7 @@ public partial class MainWindow : Window
         StatusBorder.Padding = compact ? new Thickness(10, 6, 10, 6) : new Thickness(16, 9, 16, 9);
         foreach (var button in _bankButtons)
             button.Padding = compact ? new Thickness(12, 6, 12, 6) : new Thickness(18, 9, 18, 9);
-        TileColumnsPanel.Visibility = _profile.PedalLayout == PedalLayoutMode.Tiled
+        TileColumnsPanel.Visibility = !compact && !subCompact && _profile.PedalLayout == PedalLayoutMode.Tiled
             ? Visibility.Visible
             : Visibility.Collapsed;
     }
@@ -1780,6 +1952,12 @@ public partial class MainWindow : Window
         var optimizationKey = GetWindowOptimizationKey();
         if (optimizationKey == _lastOptimizationKey) return;
         _lastOptimizationKey = optimizationKey;
+        if (_profile.IsSubCompactMode)
+        {
+            _windowPlacement.ResizeWithinCurrentMonitor(this, 210, 180, 8);
+            RememberWindowPlacement();
+            return;
+        }
         if (_profile.IsCompactMode)
         {
             _windowPlacement.ResizeWithinCurrentMonitor(this, 840, 720, 12);
@@ -1825,7 +2003,7 @@ public partial class MainWindow : Window
     }
 
     private string GetWindowOptimizationKey() =>
-        $"{Math.Max(1, _profile.Devices.Count)}:{_profile.PedalLayout}:{_profile.TileColumns}:{_profile.IsCompactMode}";
+        $"{Math.Max(1, _profile.Devices.Count)}:{_profile.PedalLayout}:{_profile.TileColumns}:{_profile.IsCompactMode}:{_profile.IsSubCompactMode}";
 
     private void Theme_Click(object sender, RoutedEventArgs e)
     {

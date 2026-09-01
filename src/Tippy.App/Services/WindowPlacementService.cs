@@ -41,10 +41,12 @@ public sealed class WindowPlacementService
         if (handle == IntPtr.Zero || window.WindowState == WindowState.Minimized) return;
         var nativePlacement = new NativeWindowPlacement { Length = Marshal.SizeOf<NativeWindowPlacement>() };
         if (!GetWindowPlacement(handle, ref nativePlacement)) return;
+        var isMaximized = window.WindowState == WindowState.Maximized || nativePlacement.ShowCommand == 3;
         var bounds = nativePlacement.NormalPosition;
+        if (!isMaximized && GetWindowRect(handle, out var currentBounds)) bounds = currentBounds;
 
         placement.HasPlacement = true;
-        placement.IsMaximized = window.WindowState == WindowState.Maximized || nativePlacement.ShowCommand == 3;
+        placement.IsMaximized = isMaximized;
         placement.Left = bounds.Left;
         placement.Top = bounds.Top;
         placement.Width = Math.Max(1, bounds.Width);

@@ -20,8 +20,12 @@
             <Grid>
                 <TextBlock Text="Compact pedal view" Style="{StaticResource SmallMutedText}"
                            VerticalAlignment="Center" FontWeight="SemiBold"/>
-                <Button Content="Full view" Click="ExitCompactMode_Click" HorizontalAlignment="Right"
-                        Padding="12,5" ToolTip="Restore Tippy's complete interface (Esc or F11)"/>
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                    <Button Content="¼ view" Click="SubCompactMode_Click" Padding="10,5" Margin="0,0,7,0"
+                            ToolTip="Switch to the minimalist one-quarter-size pedal view"/>
+                    <Button Content="Full view" Click="ExitCompactMode_Click"
+                            Padding="12,5" ToolTip="Restore Tippy's complete interface (Esc or F11)"/>
+                </StackPanel>
             </Grid>
         </Border>
 
@@ -64,6 +68,8 @@
                     <Button Content="To tray" Click="MinimizeToTray_Click" Margin="0,0,8,0" ToolTip="Keep Tippy running in the notification area"/>
                     <Button x:Name="CompactModeButton" Content="Compact view" Click="CompactMode_Click" Margin="0,0,8,0"
                             ToolTip="Hide menus and show one full-size pedal at a time (F11)"/>
+                    <Button Content="¼ view" Click="SubCompactMode_Click" Margin="0,0,8,0"
+                            ToolTip="Sub-compact: show one quarter-size pedal with no labels or menus"/>
                     <Button Content="Tools" Click="Tools_Click" Margin="0,0,8,0"/>
                     <Button Content="Help" Click="Help_Click" Margin="0,0,8,0"/>
                     <Button x:Name="ThemeButton" Content="Light mode" Click="Theme_Click"/>
@@ -153,5 +159,17 @@
                 <TextBlock x:Name="RawReportText" Grid.Column="2" Text="HID idle" Style="{StaticResource SmallMutedText}"/>
             </Grid>
         </Border>
+
+        <Grid x:Name="SubCompactSurface" Grid.Row="0" Grid.RowSpan="4"
+              Background="{DynamicResource BackgroundBrush}" Visibility="Collapsed" Panel.ZIndex="20"
+              MouseLeftButtonDown="SubCompactSurface_MouseLeftButtonDown">
+            <Grid x:Name="SubCompactPedalHost" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+            <StackPanel x:Name="SubCompactDotsPanel" Orientation="Horizontal" HorizontalAlignment="Center"
+                        VerticalAlignment="Bottom" Margin="0,0,0,5"/>
+            <Button Content="↗" Click="ExitSubCompactMode_Click" Width="28" Height="24" Padding="0"
+                    HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,4,4,0"
+                    FontSize="14" ToolTip="Return to the full Tippy interface"
+                    AutomationProperties.Name="Return to full view"/>
+        </Grid>
     </Grid>
 </Window>

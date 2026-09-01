@@ -18,13 +18,14 @@ public enum PedalLayoutMode
 public sealed class AppProfile
 {
     public const int MaxBanks = 3;
-    public int SchemaVersion { get; set; } = 9;
+    public int SchemaVersion { get; set; } = 10;
     public string Name { get; set; } = "Default";
     public AppTheme Theme { get; set; } = AppTheme.Dark;
     public int ActiveBankIndex { get; set; }
     public string BankHotkey { get; set; } = "Ctrl+Alt+B";
     public bool StartMinimized { get; set; }
     public bool IsCompactMode { get; set; }
+    public bool IsSubCompactMode { get; set; }
     public PedalLayoutMode PedalLayout { get; set; } = PedalLayoutMode.Auto;
     public int TileColumns { get; set; }
     public string SelectedTabbedDeviceKey { get; set; } = string.Empty;
@@ -42,10 +43,11 @@ public sealed class AppProfile
     public void Normalize()
     {
         var previousSchema = SchemaVersion;
-        SchemaVersion = 9;
+        SchemaVersion = 10;
         Name = string.IsNullOrWhiteSpace(Name) ? "Default" : Name.Trim();
         ActiveBankIndex = Math.Clamp(ActiveBankIndex, 0, MaxBanks - 1);
         BankHotkey = string.IsNullOrWhiteSpace(BankHotkey) ? "Ctrl+Alt+B" : BankHotkey.Trim();
+        if (IsSubCompactMode) IsCompactMode = false;
         TileColumns = Math.Clamp(TileColumns, 0, 6);
         SelectedTabbedDeviceKey = SelectedTabbedDeviceKey?.Trim() ?? string.Empty;
         Devices ??= [];

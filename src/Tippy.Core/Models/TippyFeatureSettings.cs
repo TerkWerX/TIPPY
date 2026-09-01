@@ -100,8 +100,8 @@ public sealed class WindowPlacementSettings
     {
         Left = Math.Clamp(Left, -100_000, 100_000);
         Top = Math.Clamp(Top, -100_000, 100_000);
-        Width = Math.Clamp(Width, 320, 20_000);
-        Height = Math.Clamp(Height, 240, 20_000);
+        Width = Math.Clamp(Width, 160, 20_000);
+        Height = Math.Clamp(Height, 120, 20_000);
         if (!HasPlacement)
         {
             Left = 0;
