@@ -46,6 +46,18 @@ public sealed class OverlaySettings
     }
 }
 
+public sealed class MidiOutputSettings
+{
+    public string PreferredOutputName { get; set; } = string.Empty;
+
+    public void Normalize()
+    {
+        PreferredOutputName = PreferredOutputName?.Trim() ?? string.Empty;
+    }
+
+    public MidiOutputSettings Clone() => new() { PreferredOutputName = PreferredOutputName };
+}
+
 public sealed class RawInputPedalDefinition
 {
     public string Id { get; set; } = Guid.NewGuid().ToString("N");

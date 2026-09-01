@@ -42,6 +42,8 @@ public sealed class MacroPlayer : IDisposable
         };
     }
 
+    public void ConfigureMidi(MidiOutputSettings settings) => _midi.Configure(settings);
+
     public void Handle(string triggerId, MacroDefinition macro, bool isPressed)
     {
         try

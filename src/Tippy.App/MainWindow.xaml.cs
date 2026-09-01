@@ -83,6 +83,7 @@ public partial class MainWindow : Window
         _restoreMaximizedOnLoad = _profile.WindowPlacement.IsMaximized;
         InitializeTrayIcon();
         _macroPlayer = new MacroPlayer(new WindowsInputService(), _gamepad);
+        _macroPlayer.ConfigureMidi(_profile.Midi);
         _gestureEngine.Invoked += GestureEngine_Invoked;
         Loaded += MainWindow_Loaded;
         Closed += MainWindow_Closed;
@@ -1140,6 +1141,7 @@ public partial class MainWindow : Window
             _hid.ConfigureLearnedDevices(_profile.LearnedPedals);
             SyncRawInputDevices();
             _macroPlayer.ConfigureSafety(_profile.Safety);
+            _macroPlayer.ConfigureMidi(_profile.Midi);
             _gestureEngine.ConfigureMaximumRepeatDuration(TimeSpan.FromSeconds(_profile.Safety.MaximumRepeatSeconds));
             _patternEngine.Configure(_profile.PedalPatterns);
             BuildBankButtons(); RefreshDevices(); UpdateHeader(); RegisterHotkeys();
@@ -1210,6 +1212,7 @@ public partial class MainWindow : Window
         var menu = new ContextMenu();
         menu.Items.Add(CreateToolsItem("Foot combinations & sequences", OpenFootPatterns));
         menu.Items.Add(CreateToolsItem("Live pedal diagnostics", OpenDiagnostics));
+        menu.Items.Add(CreateToolsItem("MIDI output setup", OpenMidiSetup));
         var rehearsal = new MenuItem { Header = "Rehearsal mode — preview without output", IsCheckable = true, IsChecked = _rehearsalMode };
         rehearsal.Click += (_, _) => SetRehearsalMode(rehearsal.IsChecked);
         menu.Items.Add(rehearsal);
@@ -1256,6 +1259,19 @@ public partial class MainWindow : Window
         _diagnosticsWindow.Show();
     }
 
+    private void OpenMidiSetup()
+    {
+        var setup = new MidiSetupWindow(_profile.Midi) { Owner = this };
+        if (setup.ShowDialog() != true) return;
+        _profile.Midi = setup.Result;
+        _profile.Midi.Normalize();
+        _macroPlayer.ConfigureMidi(_profile.Midi);
+        ScheduleSave();
+        SetStatus(string.IsNullOrWhiteSpace(_profile.Midi.PreferredOutputName)
+            ? "MIDI macros will use the Windows default output"
+            : $"MIDI macros will use {_profile.Midi.PreferredOutputName}");
+    }
+
     private void ShowOverlay(string title, string context)
     {
         if (!_profile.Overlay.Enabled) return;
@@ -1285,6 +1301,7 @@ public partial class MainWindow : Window
         _activeApplicationProfileId = null;
         _bankResolver.Clear();
         _macroPlayer.ConfigureSafety(_profile.Safety);
+        _macroPlayer.ConfigureMidi(_profile.Midi);
         _gestureEngine.ConfigureMaximumRepeatDuration(TimeSpan.FromSeconds(_profile.Safety.MaximumRepeatSeconds));
         _patternEngine.Configure(_profile.PedalPatterns);
         ThemeService.Apply(_profile.Theme);

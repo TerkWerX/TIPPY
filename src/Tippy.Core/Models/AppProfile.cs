@@ -18,7 +18,7 @@ public enum PedalLayoutMode
 public sealed class AppProfile
 {
     public const int MaxBanks = 3;
-    public int SchemaVersion { get; set; } = 7;
+    public int SchemaVersion { get; set; } = 8;
     public string Name { get; set; } = "Default";
     public AppTheme Theme { get; set; } = AppTheme.Dark;
     public int ActiveBankIndex { get; set; }
@@ -34,13 +34,14 @@ public sealed class AppProfile
     public List<TippyVariable> Variables { get; set; } = [];
     public MacroSafetySettings Safety { get; set; } = new();
     public OverlaySettings Overlay { get; set; } = new();
+    public MidiOutputSettings Midi { get; set; } = new();
     public List<RawInputPedalDefinition> RawInputPedals { get; set; } = [];
     public WindowPlacementSettings WindowPlacement { get; set; } = new();
 
     public void Normalize()
     {
         var previousSchema = SchemaVersion;
-        SchemaVersion = 7;
+        SchemaVersion = 8;
         Name = string.IsNullOrWhiteSpace(Name) ? "Default" : Name.Trim();
         ActiveBankIndex = Math.Clamp(ActiveBankIndex, 0, MaxBanks - 1);
         BankHotkey = string.IsNullOrWhiteSpace(BankHotkey) ? "Ctrl+Alt+B" : BankHotkey.Trim();
@@ -53,6 +54,7 @@ public sealed class AppProfile
         Variables ??= [];
         Safety ??= new MacroSafetySettings();
         Overlay ??= new OverlaySettings();
+        Midi ??= new MidiOutputSettings();
         RawInputPedals ??= [];
         WindowPlacement ??= new WindowPlacementSettings();
         foreach (var learned in LearnedPedals)
@@ -67,6 +69,7 @@ public sealed class AppProfile
         foreach (var variable in Variables) variable.Normalize();
         Safety.Normalize();
         Overlay.Normalize();
+        Midi.Normalize();
         foreach (var rawInputPedal in RawInputPedals) rawInputPedal.Normalize();
         WindowPlacement.Normalize();
         foreach (var device in Devices)

@@ -8,6 +8,7 @@ using System.Windows.Input;
 using Tippy.App.Models;
 using Tippy.App.Services;
 using Tippy.Core.Models;
+using Tippy.Core.Output;
 
 namespace Tippy.App;
 
@@ -391,9 +392,18 @@ public partial class MacroEditorWindow : Window
     private void AddMidi_Click(object sender, RoutedEventArgs e)
     {
         var value = PromptDialog.Ask(this, "MIDI output",
-            "Message: note:channel:number:velocity, cc:channel:controller:value, or pc:channel:program",
-            "note:1:60:127");
+            "note/noteon:channel:note:velocity · noteoff:channel:note:releaseVelocity · cc:channel:controller:value · pc:channel:program\nFor a held note, put note-on in Press Action and matching note-off in Release Action.",
+            "note:1:60:100");
         if (value is null) return;
+        try
+        {
+            _ = MidiMessageParser.Parse(value);
+        }
+        catch (Exception exception)
+        {
+            MessageBox.Show(this, exception.Message, "Invalid MIDI message", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
         CurrentMacro.Steps.Add(new MacroStep { Type = MacroStepType.Midi, Value = value });
         RefreshSteps(CurrentMacro.Steps.Count - 1);
     }

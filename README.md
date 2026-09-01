@@ -102,7 +102,7 @@ Assign **Switch to next bank** for hands-free cycling, or **Hold for temporary b
 
 The advanced behavior panel on every assignment can add a double-tap or long-press action, repeat the press action, or toggle a held action. Timing is adjustable per switch, and Tippy rejects ambiguous combinations such as toggle-plus-double-tap instead of guessing. Under **Tools**, foot patterns can combine switches across multiple pedals or recognize an ordered sequence. **Capture with feet** records the pattern from the connected hardware.
 
-The macro editor also supports continuous mouse movement and scrolling, MIDI (`note`, `cc`, and `pc`) and OSC output. Text and program fields can use `{date}`, `{time}`, `{clipboard}`, `{app}`, `{profile}`, `{device}`, `{pedal}`, `{bank}`, and custom `name=value` profile variables.
+The macro editor also supports continuous mouse movement and scrolling, MIDI note-on/note-off, CC, and program-change messages, plus OSC output. **Tools → MIDI output setup** selects a specific Windows MIDI endpoint and sends a real note-on/note-off test. Text and program fields can use `{date}`, `{time}`, `{clipboard}`, `{app}`, `{profile}`, `{device}`, `{pedal}`, `{bank}`, and custom `name=value` profile variables.
 
 Tippy autosaves its live profile here:
 

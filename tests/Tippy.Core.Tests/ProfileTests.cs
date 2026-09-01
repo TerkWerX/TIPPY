@@ -64,7 +64,7 @@ public sealed class ProfileTests
 
         var loaded = new ProfileSerializer().Deserialize(json);
 
-        Assert.Equal(7, loaded.SchemaVersion);
+        Assert.Equal(8, loaded.SchemaVersion);
         Assert.All(loaded.Devices, device => Assert.Equal(2, device.ActiveBankIndex));
     }
 
@@ -181,7 +181,7 @@ public sealed class ProfileTests
         var serializer = new ProfileSerializer();
         var loaded = serializer.Deserialize(serializer.Serialize(profile));
 
-        Assert.Equal(7, loaded.SchemaVersion);
+        Assert.Equal(8, loaded.SchemaVersion);
         var learned = Assert.Single(loaded.LearnedPedals);
         Assert.Equal("Custom pedal", learned.Name);
         Assert.Equal(3, learned.Switches.Count);
@@ -284,6 +284,7 @@ public sealed class ProfileTests
                 EmergencyStopHotkey = "Ctrl+Shift+Escape"
             },
             Overlay = new OverlaySettings { Enabled = true, VisibleSeconds = 5, Left = 100, Top = 200 },
+            Midi = new MidiOutputSettings { PreferredOutputName = "APC MINI" },
             RawInputPedals =
             [
                 new RawInputPedalDefinition
@@ -324,10 +325,11 @@ public sealed class ProfileTests
         var serializer = new ProfileSerializer();
         var loaded = serializer.Deserialize(serializer.Serialize(profile));
 
-        Assert.Equal(7, loaded.SchemaVersion);
+        Assert.Equal(8, loaded.SchemaVersion);
         Assert.Equal("Tippy", Assert.Single(loaded.Variables).Value);
         Assert.Equal(45, loaded.Safety.MaximumMacroSeconds);
         Assert.True(loaded.Overlay.Enabled);
+        Assert.Equal("APC MINI", loaded.Midi.PreferredOutputName);
         Assert.Equal(0x70, Assert.Single(Assert.Single(loaded.RawInputPedals).Switches).VirtualKey);
         Assert.Equal(PedalPatternType.Combination, Assert.Single(loaded.PedalPatterns).Type);
         Assert.True(loaded.Devices[0].Banks[0].Bindings[0].Gestures.Toggle);

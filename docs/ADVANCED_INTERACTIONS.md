@@ -25,9 +25,12 @@ MIDI messages use these formats:
 
 ```text
 note:channel:note:velocity
+noteoff:channel:note:releaseVelocity
 cc:channel:controller:value
 pc:channel:program
 ```
+
+`noteon` is accepted as an explicit alias for `note`, and `off` is accepted as an alias for `noteoff`. Channels are 1–16; all other values are 0–127. Tippy validates every message instead of silently clipping an invalid value. For a sustained note, assign the note-on message to **Press Action** and the matching note-off message to **Release Action**. Choose and test the profile's destination under **Tools → MIDI output setup**; Tippy remembers the device by name, reconnects lazily, and reports a missing output without redirecting to the wrong device.
 
 OSC steps accept a `/path`, comma-separated integer/decimal/text arguments, and a `host:port` destination. Both systems open resources lazily and perform no background scanning.
 
