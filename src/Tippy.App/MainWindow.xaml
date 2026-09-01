@@ -34,8 +34,8 @@
             <Grid>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="16"/>
                     <ColumnDefinition Width="*"/>
-                    <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
                 <Border x:Name="BrandBadge" Grid.Column="0" Background="#E6E8EB" BorderBrush="#C8CDD3"
                         BorderThickness="1" CornerRadius="7" Padding="8,3,10,4">
@@ -60,20 +60,21 @@
                                    HorizontalAlignment="Center" TextAlignment="Center"/>
                     </Grid>
                 </Border>
-                <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
-                    <Button Content="Open profile" Click="OpenProfile_Click" Margin="0,0,8,0"/>
-                    <Button Content="Save as" Click="SaveProfile_Click" Margin="0,0,8,0"/>
-                    <Button Content="App profiles" Click="ApplicationProfiles_Click" Margin="0,0,8,0"/>
-                    <Button Content="Settings" Click="Settings_Click" Margin="0,0,8,0"/>
-                    <Button Content="To tray" Click="MinimizeToTray_Click" Margin="0,0,8,0" ToolTip="Keep Tippy running in the notification area"/>
-                    <Button x:Name="CompactModeButton" Content="Compact view" Click="CompactMode_Click" Margin="0,0,8,0"
+                <WrapPanel x:Name="HeaderActionsPanel" Grid.Column="2" Orientation="Horizontal"
+                           HorizontalAlignment="Right" VerticalAlignment="Center">
+                    <Button Content="Open profile" Click="OpenProfile_Click" Margin="0,3,8,3"/>
+                    <Button Content="Save as" Click="SaveProfile_Click" Margin="0,3,8,3"/>
+                    <Button Content="App profiles" Click="ApplicationProfiles_Click" Margin="0,3,8,3"/>
+                    <Button Content="Settings" Click="Settings_Click" Margin="0,3,8,3"/>
+                    <Button Content="To tray" Click="MinimizeToTray_Click" Margin="0,3,8,3" ToolTip="Keep Tippy running in the notification area"/>
+                    <Button x:Name="CompactModeButton" Content="Compact view" Click="CompactMode_Click" Margin="0,3,8,3"
                             ToolTip="Hide menus and show one full-size pedal at a time (F11)"/>
-                    <Button Content="¼ view" Click="SubCompactMode_Click" Margin="0,0,8,0"
+                    <Button Content="¼ view" Click="SubCompactMode_Click" Margin="0,3,8,3"
                             ToolTip="Sub-compact: show one quarter-size pedal with no labels or menus"/>
-                    <Button Content="Tools" Click="Tools_Click" Margin="0,0,8,0"/>
-                    <Button Content="Help" Click="Help_Click" Margin="0,0,8,0"/>
-                    <Button x:Name="ThemeButton" Content="Light mode" Click="Theme_Click"/>
-                </StackPanel>
+                    <Button Content="Tools" Click="Tools_Click" Margin="0,3,8,3"/>
+                    <Button Content="Help" Click="Help_Click" Margin="0,3,8,3"/>
+                    <Button x:Name="ThemeButton" Content="Light mode" Click="Theme_Click" Margin="0,3,0,3"/>
+                </WrapPanel>
             </Grid>
         </Border>
 
