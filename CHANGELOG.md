@@ -42,6 +42,7 @@ Notable changes to Tippy are documented here.
 
 ### Fixed
 
+- Built-in Infinity and AltoEdge pedal artwork now decodes eagerly from embedded PNG streams, preventing blank transparent pedal cards in self-contained builds.
 - Layout changes now resize inside the window's current monitor and preserve its top-left position whenever physically possible instead of using the primary monitor's work area.
 - Restoring from the notification area now preserves a maximized window instead of always forcing normal state.
 

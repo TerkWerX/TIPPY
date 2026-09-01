@@ -1043,7 +1043,17 @@ public partial class MainWindow : Window
     private static BitmapImage LoadArtworkBitmap(string path)
     {
         if (path.StartsWith("/", StringComparison.Ordinal))
-            return new BitmapImage(new Uri(path, UriKind.Relative));
+        {
+            var resource = Application.GetResourceStream(new Uri(path, UriKind.Relative)) ??
+                throw new FileNotFoundException($"Embedded pedal artwork was not found: {path}");
+            using var stream = resource.Stream;
+            var embedded = new BitmapImage();
+            embedded.BeginInit();
+            embedded.CacheOption = BitmapCacheOption.OnLoad;
+            embedded.StreamSource = stream;
+            embedded.EndInit();
+            return embedded;
+        }
         var bitmap = new BitmapImage();
         bitmap.BeginInit();
         bitmap.CacheOption = BitmapCacheOption.OnLoad;
