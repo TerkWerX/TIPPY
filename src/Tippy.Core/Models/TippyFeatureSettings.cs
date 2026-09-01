@@ -112,3 +112,21 @@ public sealed class WindowPlacementSettings
         }
     }
 }
+
+public sealed class LayoutWindowSizeSettings
+{
+    public bool HasSize { get; set; }
+    public double Width { get; set; }
+    public double Height { get; set; }
+
+    public void Normalize()
+    {
+        Width = Math.Clamp(Width, 160, 20_000);
+        Height = Math.Clamp(Height, 120, 20_000);
+        if (!HasSize)
+        {
+            Width = 0;
+            Height = 0;
+        }
+    }
+}

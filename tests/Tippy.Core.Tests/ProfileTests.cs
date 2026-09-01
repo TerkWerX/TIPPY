@@ -64,7 +64,7 @@ public sealed class ProfileTests
 
         var loaded = new ProfileSerializer().Deserialize(json);
 
-        Assert.Equal(10, loaded.SchemaVersion);
+        Assert.Equal(11, loaded.SchemaVersion);
         Assert.All(loaded.Devices, device => Assert.Equal(2, device.ActiveBankIndex));
     }
 
@@ -163,6 +163,27 @@ public sealed class ProfileTests
     }
 
     [Fact]
+    public void ProfileRoundTripsIndependentLayoutWindowSizes()
+    {
+        var profile = new AppProfile
+        {
+            LayoutWindowSizes = new Dictionary<string, LayoutWindowSizeSettings>
+            {
+                ["Stacked"] = new() { HasSize = true, Width = 1120, Height = 875 },
+                ["Tiled:2"] = new() { HasSize = true, Width = 1480, Height = 940 }
+            }
+        };
+
+        var serializer = new ProfileSerializer();
+        var loaded = serializer.Deserialize(serializer.Serialize(profile));
+
+        Assert.Equal(1120, loaded.LayoutWindowSizes["sTaCkEd"].Width);
+        Assert.Equal(875, loaded.LayoutWindowSizes["Stacked"].Height);
+        Assert.Equal(1480, loaded.LayoutWindowSizes["Tiled:2"].Width);
+        Assert.Equal(940, loaded.LayoutWindowSizes["Tiled:2"].Height);
+    }
+
+    [Fact]
     public void SubCompactProfileRetainsQuarterSizeWindowPlacement()
     {
         var profile = new AppProfile
@@ -209,7 +230,7 @@ public sealed class ProfileTests
         var serializer = new ProfileSerializer();
         var loaded = serializer.Deserialize(serializer.Serialize(profile));
 
-        Assert.Equal(10, loaded.SchemaVersion);
+        Assert.Equal(11, loaded.SchemaVersion);
         var learned = Assert.Single(loaded.LearnedPedals);
         Assert.Equal("Custom pedal", learned.Name);
         Assert.Equal(3, learned.Switches.Count);
@@ -353,7 +374,7 @@ public sealed class ProfileTests
         var serializer = new ProfileSerializer();
         var loaded = serializer.Deserialize(serializer.Serialize(profile));
 
-        Assert.Equal(10, loaded.SchemaVersion);
+        Assert.Equal(11, loaded.SchemaVersion);
         Assert.Equal("Tippy", Assert.Single(loaded.Variables).Value);
         Assert.Equal(45, loaded.Safety.MaximumMacroSeconds);
         Assert.True(loaded.Overlay.Enabled);

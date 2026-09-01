@@ -42,7 +42,7 @@ public partial class MainWindow : Window
     private readonly Dictionary<string, PedalDeviceInfo> _connected = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<(string DeviceKey, int SwitchIndex), Border> _switchTiles = new();
     private readonly Dictionary<string, Border> _pedalTabHeaders = new(StringComparer.OrdinalIgnoreCase);
-    private readonly List<Viewbox> _sizablePedalVisuals = [];
+    private readonly List<(FrameworkElement Visual, double MinimumHeight)> _sizablePedalVisuals = [];
     private readonly HashSet<(string DeviceKey, int SwitchIndex)> _pressedSwitches = [];
     private readonly HashSet<string> _artworkPickerQueued = new(StringComparer.OrdinalIgnoreCase);
     private readonly Queue<(PedalDeviceProfile Profile, PedalDeviceInfo Info)> _pendingArtworkPickers = new();
@@ -504,6 +504,7 @@ public partial class MainWindow : Window
         var count = _profile.Devices.Count;
         var columns = GetGridColumnCount(count);
         var rows = Math.Max(1, (int)Math.Ceiling(count / (double)columns));
+        var denseRows = rows > 1;
         _lastAutoSideBySide = columns > 1;
         for (var column = 0; column < columns; column++)
             DevicesPanel.ColumnDefinitions.Add(new ColumnDefinition());
@@ -516,12 +517,12 @@ public partial class MainWindow : Window
             device.Normalize();
             var row = index / columns;
             var column = index % columns;
-            var card = CreateDeviceCard(device, _connected.ContainsKey(device.DeviceKey), false);
+            var card = CreateDeviceCard(device, _connected.ContainsKey(device.DeviceKey), false, rows > 1);
             card.Margin = new Thickness(
                 column == 0 ? 0 : 7,
-                row == 0 ? 0 : 7,
+                row == 0 ? 0 : denseRows ? 4 : 7,
                 column == columns - 1 || index == count - 1 ? 0 : 7,
-                row == rows - 1 ? 14 : 7);
+                row == rows - 1 ? denseRows ? 6 : 14 : denseRows ? 4 : 7);
             Grid.SetRow(card, row);
             Grid.SetColumn(card, column);
             DevicesPanel.Children.Add(card);
@@ -633,13 +634,13 @@ public partial class MainWindow : Window
         return header;
     }
 
-    private Border CreateDeviceCard(PedalDeviceProfile device, bool connected, bool compact)
+    private Border CreateDeviceCard(PedalDeviceProfile device, bool connected, bool compact, bool denseRows = false)
     {
         var shell = new Border
         {
             Background = (Brush)FindResource("SurfaceBrush"), BorderBrush = (Brush)FindResource("BorderBrush"),
             BorderThickness = new Thickness(1), CornerRadius = new CornerRadius(11),
-            Padding = compact ? new Thickness(10) : new Thickness(18),
+            Padding = compact || denseRows ? new Thickness(10) : new Thickness(18),
             Margin = compact ? new Thickness(6) : new Thickness(0), AllowDrop = true
         };
         shell.DragOver += (_, args) => PedalCard_DragOver(shell, device.DeviceKey, args);
@@ -651,7 +652,7 @@ public partial class MainWindow : Window
         shell.Drop += (_, args) => PedalCard_Drop(shell, device.DeviceKey, args);
         var stack = new StackPanel();
         shell.Child = stack;
-        var header = new Grid { Margin = new Thickness(0, 0, 0, compact ? 8 : 14) };
+        var header = new Grid { Margin = new Thickness(0, 0, 0, compact ? 8 : denseRows ? 6 : 14) };
         header.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         header.ColumnDefinitions.Add(new ColumnDefinition());
         header.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
@@ -659,7 +660,7 @@ public partial class MainWindow : Window
         {
             Tag = device.DeviceKey, Background = (Brush)FindResource("SurfaceAltBrush"),
             BorderBrush = (Brush)FindResource("BorderBrush"), BorderThickness = new Thickness(1),
-            CornerRadius = new CornerRadius(7), Padding = new Thickness(9, 5, 9, 5),
+            CornerRadius = new CornerRadius(7), Padding = denseRows ? new Thickness(7, 3, 7, 3) : new Thickness(9, 5, 9, 5),
             Margin = new Thickness(0, 0, 11, 0), Cursor = System.Windows.Input.Cursors.SizeAll,
             VerticalAlignment = VerticalAlignment.Top, ToolTip = "Drag to change this pedal's position",
             Child = new TextBlock
@@ -672,8 +673,11 @@ public partial class MainWindow : Window
         grabHandle.PreviewMouseMove += PedalHandle_PreviewMouseMove;
         header.Children.Add(grabHandle);
         var titleStack = new StackPanel();
-        titleStack.Children.Add(new TextBlock { Text = device.DisplayName, FontSize = 17, FontWeight = FontWeights.SemiBold });
         titleStack.Children.Add(new TextBlock
+        {
+            Text = device.DisplayName, FontSize = denseRows ? 15 : 17, FontWeight = FontWeights.SemiBold
+        });
+        if (!denseRows) titleStack.Children.Add(new TextBlock
         {
             Text = $"VID_{device.VendorId:X4} · PID_{device.ProductId:X4} · {ShortDeviceKey(device.DeviceKey)}",
             Style = (Style)FindResource("SmallMutedText"), Margin = new Thickness(0, 3, 0, 0)
@@ -683,7 +687,7 @@ public partial class MainWindow : Window
         var badge = new Border
         {
             Background = (Brush)FindResource(connected ? "AccentSoftBrush" : "SurfaceAltBrush"), CornerRadius = new CornerRadius(20),
-            Padding = new Thickness(10, 5, 10, 5), Child = new TextBlock
+            Padding = denseRows ? new Thickness(8, 3, 8, 3) : new Thickness(10, 5, 10, 5), Child = new TextBlock
             {
                 Text = connected ? "●  CONNECTED" : "○  DISCONNECTED",
                 Foreground = (Brush)FindResource(connected ? "SuccessBrush" : "MutedTextBrush"),
@@ -693,7 +697,7 @@ public partial class MainWindow : Window
         var headerTools = new StackPanel { Orientation = Orientation.Horizontal };
         var pictureButton = new Button
         {
-            Content = "Picture", Padding = new Thickness(10, 5, 10, 5),
+            Content = "Picture", Padding = denseRows ? new Thickness(8, 3, 8, 3) : new Thickness(10, 5, 10, 5),
             Margin = new Thickness(0, 0, 8, 0), ToolTip = "Choose the artwork used for this pedal"
         };
         pictureButton.Click += (_, _) =>
@@ -706,12 +710,12 @@ public partial class MainWindow : Window
         Grid.SetColumn(headerTools, 2);
         header.Children.Add(headerTools);
         if (!_profile.IsCompactMode) stack.Children.Add(header);
-        stack.Children.Add(CreateDeviceBankBar(device, compact));
-        stack.Children.Add(CreatePedalVisual(device, connected));
+        stack.Children.Add(CreateDeviceBankBar(device, compact, denseRows));
+        stack.Children.Add(CreatePedalVisual(device, connected, denseRows));
         return shell;
     }
 
-    private FrameworkElement CreateDeviceBankBar(PedalDeviceProfile device, bool compact)
+    private FrameworkElement CreateDeviceBankBar(PedalDeviceProfile device, bool compact, bool denseRows)
     {
         var effectiveBankIndex = GetEffectiveBankIndex(device);
         var applicationProfile = GetActiveApplicationProfile();
@@ -720,8 +724,8 @@ public partial class MainWindow : Window
         {
             Background = (Brush)FindResource("SurfaceAltBrush"),
             BorderBrush = (Brush)FindResource("BorderBrush"), BorderThickness = new Thickness(1),
-            CornerRadius = new CornerRadius(8), Padding = new Thickness(9, 7, 9, 7),
-            Margin = new Thickness(0, 0, 0, compact ? 6 : 10)
+            CornerRadius = new CornerRadius(8), Padding = denseRows ? new Thickness(7, 4, 7, 4) : new Thickness(9, 7, 9, 7),
+            Margin = new Thickness(0, 0, 0, compact ? 6 : denseRows ? 4 : 10)
         };
         var grid = new Grid();
         grid.ColumnDefinitions.Add(new ColumnDefinition());
@@ -744,7 +748,7 @@ public partial class MainWindow : Window
             var active = effectiveBankIndex == index;
             var button = new Button
             {
-                Content = (index + 1).ToString(), Padding = new Thickness(10, 4, 10, 4),
+                Content = (index + 1).ToString(), Padding = denseRows ? new Thickness(8, 2, 8, 2) : new Thickness(10, 4, 10, 4),
                 Margin = new Thickness(0, 0, 5, 0), ToolTip = device.Banks[index].Name,
                 Background = (Brush)FindResource(active ? "AccentBrush" : "SurfaceBrush"),
                 Foreground = active ? Brushes.Black : (Brush)FindResource("TextBrush"),
@@ -758,11 +762,11 @@ public partial class MainWindow : Window
         if (!_profile.IsCompactMode)
         {
             var tools = new StackPanel { Orientation = Orientation.Horizontal };
-            var save = new Button { Content = "Save bank", Padding = new Thickness(9, 4, 9, 4), Margin = new Thickness(0, 0, 5, 0) };
+            var save = new Button { Content = "Save bank", Padding = denseRows ? new Thickness(8, 2, 8, 2) : new Thickness(9, 4, 9, 4), Margin = new Thickness(0, 0, 5, 0) };
             save.Click += async (_, _) => await SavePedalBankAsync(device);
-            var load = new Button { Content = "Load bank", Padding = new Thickness(9, 4, 9, 4), Margin = new Thickness(0, 0, 5, 0) };
+            var load = new Button { Content = "Load bank", Padding = denseRows ? new Thickness(8, 2, 8, 2) : new Thickness(9, 4, 9, 4), Margin = new Thickness(0, 0, 5, 0) };
             load.Click += async (_, _) => await LoadPedalBankAsync(device);
-            var copy = new Button { Content = "Copy to…", Padding = new Thickness(9, 4, 9, 4), ToolTip = "Copy this bank to one or more compatible pedals" };
+            var copy = new Button { Content = "Copy to…", Padding = denseRows ? new Thickness(8, 2, 8, 2) : new Thickness(9, 4, 9, 4), ToolTip = "Copy this bank to one or more compatible pedals" };
             copy.Click += (_, _) => CopyPedalBank(device);
             tools.Children.Add(save);
             tools.Children.Add(load);
@@ -960,12 +964,12 @@ public partial class MainWindow : Window
         SetStatus($"Moved {source.DisplayName} {(insertAfter ? "after" : "before")} {target.DisplayName}");
     }
 
-    private FrameworkElement CreatePedalVisual(PedalDeviceProfile device, bool connected)
+    private FrameworkElement CreatePedalVisual(PedalDeviceProfile device, bool connected, bool denseRows = false)
     {
         var artwork = _pedalRegistry.ResolveArtwork(device.ArtworkKey, GetDeviceInfo(device));
         if (artwork is null || string.IsNullOrWhiteSpace(artwork.ImagePath))
         {
-            return CreateGenericPedalVisual(device, connected, artwork?.ModelLabel);
+            return CreateGenericPedalVisual(device, connected, artwork?.ModelLabel, denseRows);
         }
 
         var canvas = new Grid
@@ -985,7 +989,73 @@ public partial class MainWindow : Window
         }
         catch
         {
-            return CreateGenericPedalVisual(device, connected, artwork.ModelLabel);
+            return CreateGenericPedalVisual(device, connected, artwork.ModelLabel, denseRows);
+        }
+
+        if (denseRows)
+        {
+            var denseVisual = new Grid
+            {
+                Height = 105,
+                MaxHeight = 105,
+                ClipToBounds = true,
+                HorizontalAlignment = HorizontalAlignment.Stretch
+            };
+            denseVisual.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(175) });
+            denseVisual.ColumnDefinitions.Add(new ColumnDefinition());
+            var photoHost = new Grid { Margin = new Thickness(0, 0, 8, 0) };
+            photoHost.Children.Add(new Viewbox
+            {
+                Stretch = Stretch.Uniform,
+                StretchDirection = StretchDirection.DownOnly,
+                HorizontalAlignment = HorizontalAlignment.Stretch,
+                Child = canvas
+            });
+            var denseActions = new Grid { Margin = new Thickness(0, 2, 0, 2) };
+            Grid.SetColumn(denseActions, 1);
+            denseVisual.Children.Add(denseActions);
+            for (var index = 0; index < device.SwitchCount; index++)
+                denseActions.ColumnDefinitions.Add(new ColumnDefinition
+                {
+                    Width = device.SwitchCount == 3
+                        ? new GridLength(index == 1 ? 52 : 24, GridUnitType.Star)
+                        : new GridLength(1, GridUnitType.Star)
+                });
+            for (var index = 0; index < device.SwitchCount; index++)
+            {
+                var tile = CreateSwitchOverlay(device, index, connected, true);
+                Grid.SetColumn(tile, index);
+                denseActions.Children.Add(tile);
+            }
+
+            var pressZones = new Grid { Margin = new Thickness(7, 5, 7, 6) };
+            photoHost.Children.Add(pressZones);
+            for (var index = 0; index < device.SwitchCount; index++)
+                pressZones.ColumnDefinitions.Add(new ColumnDefinition
+                {
+                    Width = device.SwitchCount == 3
+                        ? new GridLength(index == 1 ? 52 : 24, GridUnitType.Star)
+                        : new GridLength(1, GridUnitType.Star)
+                });
+            for (var index = 0; index < device.SwitchCount; index++)
+            {
+                var zone = new Border
+                {
+                    Background = Brushes.Transparent,
+                    BorderBrush = Brushes.Transparent,
+                    BorderThickness = new Thickness(2),
+                    CornerRadius = new CornerRadius(8),
+                    Margin = new Thickness(2),
+                    Opacity = connected ? 1 : 0.82,
+                    ToolTip = $"Pedal {index + 1}"
+                };
+                _switchTiles[(device.DeviceKey, index)] = zone;
+                Grid.SetColumn(zone, index);
+                pressZones.Children.Add(zone);
+            }
+            denseVisual.Children.Add(photoHost);
+            _sizablePedalVisuals.Add((denseVisual, 75));
+            return denseVisual;
         }
 
         var overlays = new Grid { Margin = new Thickness(36, 24, 36, 30) };
@@ -1014,7 +1084,7 @@ public partial class MainWindow : Window
             HorizontalAlignment = HorizontalAlignment.Stretch,
             Child = canvas
         };
-        _sizablePedalVisuals.Add(viewbox);
+        _sizablePedalVisuals.Add((viewbox, 48));
         return viewbox;
     }
 
@@ -1077,10 +1147,32 @@ public partial class MainWindow : Window
         };
     }
 
-    private FrameworkElement CreateGenericPedalVisual(PedalDeviceProfile device, bool connected, string? modelLabel = null)
+    private FrameworkElement CreateGenericPedalVisual(
+        PedalDeviceProfile device,
+        bool connected,
+        string? modelLabel = null,
+        bool denseRows = false)
     {
         var columns = Math.Min(6, Math.Max(1, (int)Math.Ceiling(Math.Sqrt(device.SwitchCount))));
         var rows = (int)Math.Ceiling(device.SwitchCount / (double)columns);
+        if (denseRows)
+        {
+            var densePanel = new System.Windows.Controls.Primitives.UniformGrid
+            {
+                Columns = columns,
+                Rows = rows,
+                Height = Math.Clamp(rows * 65, 95, 280),
+                MaxHeight = Math.Clamp(rows * 65, 95, 280),
+                Background = (Brush)FindResource("SurfaceAltBrush"),
+                ToolTip = string.IsNullOrWhiteSpace(modelLabel)
+                    ? $"Unknown pedal · VID_{device.VendorId:X4} PID_{device.ProductId:X4}"
+                    : modelLabel
+            };
+            for (var index = 0; index < device.SwitchCount; index++)
+                densePanel.Children.Add(CreateSwitchOverlay(device, index, connected, true));
+            _sizablePedalVisuals.Add((densePanel, Math.Clamp(rows * 55, 70, 240)));
+            return densePanel;
+        }
         var panel = new System.Windows.Controls.Primitives.UniformGrid
         {
             Columns = columns,
@@ -1121,7 +1213,7 @@ public partial class MainWindow : Window
             HorizontalAlignment = HorizontalAlignment.Stretch,
             Child = shell
         };
-        _sizablePedalVisuals.Add(viewbox);
+        _sizablePedalVisuals.Add((viewbox, 48));
         return viewbox;
     }
 
@@ -1188,15 +1280,15 @@ public partial class MainWindow : Window
         return bitmap;
     }
 
-    private Border CreateSwitchOverlay(PedalDeviceProfile device, int switchIndex, bool connected)
+    private Border CreateSwitchOverlay(PedalDeviceProfile device, int switchIndex, bool connected, bool dense = false)
     {
         var bankIndex = GetEffectiveBankIndex(device);
         var binding = device.Banks[bankIndex].Bindings[switchIndex];
         var tile = new Border
         {
             Background = Brushes.Transparent, BorderBrush = Brushes.Transparent,
-            BorderThickness = new Thickness(4), CornerRadius = new CornerRadius(18),
-            Margin = new Thickness(4), Opacity = connected ? 1 : 0.82
+            BorderThickness = new Thickness(dense ? 2 : 4), CornerRadius = new CornerRadius(dense ? 8 : 18),
+            Margin = new Thickness(dense ? 2 : 4), Opacity = connected ? 1 : 0.82
         };
         _switchTiles[(device.DeviceKey, switchIndex)] = tile;
         var grid = new Grid();
@@ -1206,27 +1298,30 @@ public partial class MainWindow : Window
         var labelPanel = new Border
         {
             Background = new SolidColorBrush(Color.FromArgb(220, 13, 20, 28)),
-            CornerRadius = new CornerRadius(10), Padding = new Thickness(10, 8, 10, 8),
-            Margin = new Thickness(5), VerticalAlignment = VerticalAlignment.Bottom
+            CornerRadius = new CornerRadius(dense ? 6 : 10),
+            Padding = dense ? new Thickness(4, 2, 4, 2) : new Thickness(10, 8, 10, 8),
+            Margin = new Thickness(dense ? 2 : 5), VerticalAlignment = VerticalAlignment.Bottom
         };
         var description = new StackPanel();
         labelPanel.Child = description;
         description.Children.Add(new TextBlock
         {
-            Text = binding.DisplayName, FontSize = 19, Foreground = Brushes.White,
+            Text = binding.DisplayName, FontSize = dense ? 13 : 19, Foreground = Brushes.White,
             FontWeight = FontWeights.SemiBold, TextTrimming = TextTrimming.CharacterEllipsis,
             TextAlignment = TextAlignment.Center
         });
         description.Children.Add(new TextBlock
         {
             Text = binding.Summary, Foreground = new SolidColorBrush(Color.FromRgb(183, 207, 226)),
-            Margin = new Thickness(0, 3, 0, 6), TextWrapping = TextWrapping.Wrap,
-            TextAlignment = TextAlignment.Center, FontSize = 14, MaxHeight = 40
+            Margin = dense ? new Thickness(0, 0, 0, 2) : new Thickness(0, 3, 0, 6),
+            TextWrapping = TextWrapping.Wrap,
+            TextAlignment = TextAlignment.Center, FontSize = dense ? 10 : 14, MaxHeight = dense ? 14 : 40
         });
         var edit = new Button
         {
             Content = "Edit assignment", HorizontalAlignment = HorizontalAlignment.Center,
-            Padding = new Thickness(11, 5, 11, 5), FontSize = 13
+            Padding = dense ? new Thickness(6, 2, 6, 2) : new Thickness(11, 5, 11, 5),
+            FontSize = dense ? 11 : 13
         };
         edit.Click += (_, _) => EditBinding(device, switchIndex, bankIndex);
         description.Children.Add(edit);
@@ -1269,7 +1364,8 @@ public partial class MainWindow : Window
             _macroPlayer.ConfigureMidi(_profile.Midi);
             _gestureEngine.ConfigureMaximumRepeatDuration(TimeSpan.FromSeconds(_profile.Safety.MaximumRepeatSeconds));
             _patternEngine.Configure(_profile.PedalPatterns);
-            BuildBankButtons(); RefreshDevices(); UpdateHeader(); RegisterHotkeys();
+            _lastOptimizationKey = string.Empty;
+            BuildBankButtons(); RefreshDevices(true); UpdateHeader(); RegisterHotkeys();
             await _hid.ScanAsync();
             await _profileStore.SaveDefaultAsync(_profile);
             SetStatus($"Loaded {System.IO.Path.GetFileName(dialog.FileName)}");
@@ -1435,7 +1531,8 @@ public partial class MainWindow : Window
         _hid.ConfigureLearnedDevices(_profile.LearnedPedals);
         SyncRawInputDevices();
         BuildBankButtons();
-        RefreshDevices();
+        _lastOptimizationKey = string.Empty;
+        RefreshDevices(true);
         UpdateHeader();
         RegisterHotkeys();
         SetStatus("Restored profile backup");
@@ -1739,6 +1836,7 @@ public partial class MainWindow : Window
             return;
         }
         if (_profile.IsCompactMode && !_profile.IsSubCompactMode) return;
+        RememberCurrentLayoutSize();
         if (WindowState == WindowState.Maximized) WindowState = WindowState.Normal;
         _profile.IsCompactMode = true;
         _profile.IsSubCompactMode = false;
@@ -1756,6 +1854,7 @@ public partial class MainWindow : Window
             return;
         }
         if (_profile.IsSubCompactMode) return;
+        RememberCurrentLayoutSize();
         if (WindowState == WindowState.Maximized) WindowState = WindowState.Normal;
         _profile.IsCompactMode = false;
         _profile.IsSubCompactMode = true;
@@ -1809,6 +1908,8 @@ public partial class MainWindow : Window
         if (!_loaded || _updatingLayoutSelection) return;
         if (!Enum.TryParse<PedalLayoutMode>((DeviceLayoutBox.SelectedItem as ComboBoxItem)?.Tag?.ToString(), out var mode))
             mode = PedalLayoutMode.Auto;
+        if (mode == _profile.PedalLayout) return;
+        RememberCurrentLayoutSize();
         _profile.PedalLayout = mode;
         _lastOptimizationKey = string.Empty;
         RefreshDevices(true);
@@ -1819,6 +1920,7 @@ public partial class MainWindow : Window
     private void TileColumnsBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
         if (!_loaded || _updatingLayoutSelection) return;
+        RememberCurrentLayoutSize();
         _profile.TileColumns = int.TryParse((TileColumnsBox.SelectedItem as ComboBoxItem)?.Tag?.ToString(), out var columns)
             ? Math.Clamp(columns, 0, 6)
             : 0;
@@ -1888,6 +1990,7 @@ public partial class MainWindow : Window
     {
         var compact = _profile.IsCompactMode;
         var subCompact = _profile.IsSubCompactMode;
+        var denseRows = !compact && !subCompact && UsesDenseMultiRowLayout();
         MinWidth = subCompact ? 210 : compact ? 840 : 920;
         MinHeight = subCompact ? 180 : compact ? 700 : 650;
         WindowStyle = subCompact ? WindowStyle.None : WindowStyle.SingleBorderWindow;
@@ -1911,8 +2014,10 @@ public partial class MainWindow : Window
         HeaderTagline.FontSize = compact ? 10 : 12;
         HeaderTagline.Margin = compact ? new Thickness(0, -4, 0, 0) : new Thickness(0, -5, 0, 0);
         AllPedalsBorder.Padding = compact ? new Thickness(12, 8, 12, 8) : new Thickness(24, 13, 24, 13);
-        DevicesContent.Margin = compact ? new Thickness(12, 10, 12, 12) : new Thickness(24, 22, 24, 30);
-        DevicesToolbar.Margin = compact ? new Thickness(0, 0, 0, 8) : new Thickness(0, 0, 0, 14);
+        DevicesContent.Margin = compact
+            ? new Thickness(12, 10, 12, 12)
+            : denseRows ? new Thickness(24, 12, 24, 12) : new Thickness(24, 22, 24, 30);
+        DevicesToolbar.Margin = compact || denseRows ? new Thickness(0, 0, 0, 8) : new Thickness(0, 0, 0, 14);
         StatusBorder.Padding = compact ? new Thickness(10, 6, 10, 6) : new Thickness(16, 9, 16, 9);
         foreach (var button in _bankButtons)
             button.Padding = compact ? new Thickness(12, 6, 12, 6) : new Thickness(18, 9, 18, 9);
@@ -1950,10 +2055,14 @@ public partial class MainWindow : Window
             return;
         }
 
-        // First use any free space below the window. If that cannot eliminate the
-        // overflow, preserve the window's position and reduce only the pedal image
-        // area; the bank and assignment controls retain their normal dimensions.
-        if (pass == 0 && WindowState == WindowState.Normal)
+        // One-row layouts can use nearby free space first. Multi-row layouts reduce
+        // only the pedal image area before growing so stacked/tiled views stay useful
+        // on lower-resolution displays; bank and assignment controls keep their size.
+        var rows = UsesTabbedPedalPresentation()
+            ? 1
+            : Math.Max(1, (int)Math.Ceiling(
+                Math.Max(1, _profile.Devices.Count) / (double)GetGridColumnCount(_profile.Devices.Count)));
+        if (pass == 0 && rows == 1 && WindowState == WindowState.Normal)
         {
             _windowPlacement.GrowWithinCurrentMonitor(
                 this, ActualWidth, ActualHeight + overflow + 6, _profile.IsCompactMode ? 12 : 16);
@@ -1961,22 +2070,26 @@ public partial class MainWindow : Window
             return;
         }
 
-        var rows = UsesTabbedPedalPresentation()
-            ? 1
-            : Math.Max(1, (int)Math.Ceiling(
-                Math.Max(1, _profile.Devices.Count) / (double)GetGridColumnCount(_profile.Devices.Count)));
         var adjusted = false;
-        foreach (var visual in _sizablePedalVisuals)
+        foreach (var sizable in _sizablePedalVisuals)
         {
             var reduced = LayoutFitCalculator.ReduceVisualHeight(
-                visual.MaxHeight, overflow, rows, 48, 6);
-            if (reduced >= visual.MaxHeight - 0.1) continue;
-            visual.MaxHeight = reduced;
+                sizable.Visual.MaxHeight, overflow, rows, sizable.MinimumHeight, 6);
+            if (reduced >= sizable.Visual.MaxHeight - 0.1) continue;
+            sizable.Visual.MaxHeight = reduced;
             adjusted = true;
         }
 
         if (adjusted && pass < 8)
         {
+            ScheduleNoScrollLayoutFit(layoutGeneration, pass + 1);
+            return;
+        }
+
+        if (WindowState == WindowState.Normal && pass < 8)
+        {
+            _windowPlacement.GrowWithinCurrentMonitor(
+                this, ActualWidth, ActualHeight + overflow + 6, _profile.IsCompactMode ? 12 : 16);
             ScheduleNoScrollLayoutFit(layoutGeneration, pass + 1);
             return;
         }
@@ -1988,6 +2101,13 @@ public partial class MainWindow : Window
 
     private bool UsesTabbedPedalPresentation() =>
         _profile.IsCompactMode || _profile.PedalLayout == PedalLayoutMode.Tabbed;
+
+    private bool UsesDenseMultiRowLayout()
+    {
+        if (_profile.Devices.Count < 2 || UsesTabbedPedalPresentation()) return false;
+        var columns = GetGridColumnCount(_profile.Devices.Count);
+        return (int)Math.Ceiling(_profile.Devices.Count / (double)columns) > 1;
+    }
 
     private void MainWindow_SizeChanged(object sender, SizeChangedEventArgs e)
     {
@@ -2016,7 +2136,34 @@ public partial class MainWindow : Window
     {
         if (!_loaded) return;
         _windowPlacement.Capture(this, _profile.WindowPlacement);
+        RememberCurrentLayoutSize();
         ScheduleSave();
+    }
+
+    private void RememberCurrentLayoutSize()
+    {
+        if (!_loaded || _profile.IsCompactMode || _profile.IsSubCompactMode ||
+            WindowState != WindowState.Normal || ActualWidth <= 0 || ActualHeight <= 0)
+            return;
+        _profile.LayoutWindowSizes[GetLayoutWindowSizeKey()] = new LayoutWindowSizeSettings
+        {
+            HasSize = true,
+            Width = ActualWidth,
+            Height = ActualHeight
+        };
+    }
+
+    private string GetLayoutWindowSizeKey() =>
+        _profile.PedalLayout == PedalLayoutMode.Tiled
+            ? $"{PedalLayoutMode.Tiled}:{_profile.TileColumns}"
+            : _profile.PedalLayout.ToString();
+
+    private bool RestoreCurrentLayoutSize()
+    {
+        if (!_profile.LayoutWindowSizes.TryGetValue(GetLayoutWindowSizeKey(), out var size) || !size.HasSize)
+            return false;
+        _windowPlacement.ResizeAtCurrentPositionWithinMonitor(this, size.Width, size.Height, 16);
+        return true;
     }
 
     private void OptimizeWindowForPedals()
@@ -2038,9 +2185,14 @@ public partial class MainWindow : Window
             RememberWindowPlacement();
             return;
         }
+        if (RestoreCurrentLayoutSize())
+        {
+            RememberWindowPlacement();
+            return;
+        }
         if (_profile.PedalLayout == PedalLayoutMode.Tabbed)
         {
-            _windowPlacement.GrowWithinCurrentMonitor(this, 1050, 1050, 16);
+            _windowPlacement.ResizeAtCurrentPositionWithinMonitor(this, 1050, 760, 16);
             RememberWindowPlacement();
             return;
         }
@@ -2064,15 +2216,15 @@ public partial class MainWindow : Window
             _ => sideBySide ? 1680 : 1240
         };
         var desiredHeight = _profile.PedalLayout == PedalLayoutMode.Tiled
-            ? rows switch { <= 1 => 1050, _ => 1400 }
+            ? rows switch { <= 1 => 760, _ => 800 }
             : count switch
         {
-            <= 1 => 1050,
-            2 when sideBySide => 1050,
-            2 => 1400,
-            _ => sideBySide ? 1050 : 1400
+            <= 1 => 760,
+            2 when sideBySide => 760,
+            2 => 700,
+            _ => sideBySide ? 800 : 850
         };
-        _windowPlacement.GrowWithinCurrentMonitor(this, desiredWidth, desiredHeight, 16);
+        _windowPlacement.ResizeAtCurrentPositionWithinMonitor(this, desiredWidth, desiredHeight, 16);
         RememberWindowPlacement();
     }
 
@@ -2170,6 +2322,7 @@ public partial class MainWindow : Window
         SystemEvents.SessionSwitch -= SystemEvents_SessionSwitch;
         SystemEvents.PowerModeChanged -= SystemEvents_PowerModeChanged;
         _windowPlacement.Capture(this, _profile.WindowPlacement);
+        RememberCurrentLayoutSize();
         _saveDebounce?.Cancel();
         try { _profileStore.SaveDefaultAsync(_profile).GetAwaiter().GetResult(); } catch { }
         if (_trayIcon is not null)

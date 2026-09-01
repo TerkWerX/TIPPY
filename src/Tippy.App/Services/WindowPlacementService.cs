@@ -119,6 +119,37 @@ public sealed class WindowPlacementService
         SetWindowPos(handle, IntPtr.Zero, left, top, width, height, SwpNoActivate | SwpNoZOrder);
     }
 
+    public void ResizeAtCurrentPositionWithinMonitor(
+        Window window,
+        double desiredWidth,
+        double desiredHeight,
+        double margin)
+    {
+        var handle = new WindowInteropHelper(window).Handle;
+        if (handle == IntPtr.Zero || !GetWindowRect(handle, out var current)) return;
+        var anchor = new NativeRect
+        {
+            Left = current.Left,
+            Top = current.Top,
+            Right = current.Left + 1,
+            Bottom = current.Top + 1
+        };
+        var work = GetNearestWorkArea(anchor);
+        var dpi = GetWindowDpi(handle);
+        var marginPixels = DipToPixels(margin, dpi);
+        var availableWidth = Math.Max(1, work.Right - marginPixels - current.Left);
+        var availableHeight = Math.Max(1, work.Bottom - marginPixels - current.Top);
+        var minimumWidth = Math.Min(DipToPixels(window.MinWidth, dpi), availableWidth);
+        var minimumHeight = Math.Min(DipToPixels(window.MinHeight, dpi), availableHeight);
+        var width = Math.Clamp(DipToPixels(desiredWidth, dpi), minimumWidth, availableWidth);
+        var height = Math.Clamp(DipToPixels(desiredHeight, dpi), minimumHeight, availableHeight);
+
+        // A remembered layout size is restored around the user's existing anchor;
+        // changing layouts must not make the window jump to another screen.
+        SetWindowPos(handle, IntPtr.Zero, current.Left, current.Top, width, height,
+            SwpNoActivate | SwpNoZOrder);
+    }
+
     private static NativeRect FitEntirelyWithin(
         NativeRect work,
         NativeRect requested,
