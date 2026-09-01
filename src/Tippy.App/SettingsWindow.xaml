@@ -48,7 +48,7 @@
                     <TextBlock x:Name="GamepadStatusText" Text="Not tested" TextWrapping="Wrap"
                                Style="{StaticResource SmallMutedText}" Margin="0,5,15,0"/>
                 </StackPanel>
-                <Button Grid.Column="1" Content="Test driver" Click="TestGamepad_Click" VerticalAlignment="Center"/>
+                <Button Grid.Column="1" Content="Test buttons + analog" Click="TestGamepad_Click" VerticalAlignment="Center"/>
             </Grid>
         </Border>
         <Border Grid.Row="3" Background="{DynamicResource SurfaceBrush}" BorderBrush="{DynamicResource BorderBrush}"
@@ -67,9 +67,10 @@
                     <TextBlock Text="Max steps" VerticalAlignment="Center" Margin="0,0,7,0"/><TextBox x:Name="MaximumStepsBox" Width="68"/>
                 </WrapPanel>
                 <TextBlock Text="Emergency-stop shortcut" Margin="0,10,0,4"/><TextBox x:Name="EmergencyHotkeyBox"/>
-                <TextBlock Text="PROFILE VARIABLES — one name=value per line. Use {name}, {date}, {time}, {clipboard}, {app}, {device}, {pedal}, or {bank} in text and program fields."
-                           Style="{StaticResource SmallMutedText}" TextWrapping="Wrap" Margin="0,10,0,4"/>
-                <TextBox x:Name="VariablesBox" AcceptsReturn="True" Height="76" VerticalScrollBarVisibility="Auto" FontFamily="Consolas"/>
+                <Grid Margin="0,12,0,0">
+                    <StackPanel><TextBlock Text="NAMED VARIABLES" Style="{StaticResource SmallMutedText}" FontWeight="Bold"/><TextBlock x:Name="VariablesSummaryText" Style="{StaticResource SmallMutedText}" Margin="0,4,130,0" TextWrapping="Wrap"/></StackPanel>
+                    <Button Content="Manage variables" Click="ManageVariables_Click" HorizontalAlignment="Right" VerticalAlignment="Center"/>
+                </Grid>
             </StackPanel>
         </Border>
         <TextBlock Grid.Row="4" Text="Keyboard and mouse macros work without another driver. Gamepad steps need ViGEmBus 1.22 or a compatible virtual-controller bus installed; Tippy never installs a kernel driver automatically."

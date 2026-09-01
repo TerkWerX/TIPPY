@@ -58,6 +58,57 @@ public sealed class MidiOutputSettings
     public MidiOutputSettings Clone() => new() { PreferredOutputName = PreferredOutputName };
 }
 
+public sealed class OscEndpointPreset
+{
+    public string Id { get; set; } = Guid.NewGuid().ToString("N");
+    public string Name { get; set; } = "Local OSC";
+    public string Host { get; set; } = "127.0.0.1";
+    public int Port { get; set; } = 8000;
+
+    public void Normalize()
+    {
+        Id = string.IsNullOrWhiteSpace(Id) ? Guid.NewGuid().ToString("N") : Id.Trim();
+        Name = string.IsNullOrWhiteSpace(Name) ? "OSC endpoint" : Name.Trim();
+        Host = string.IsNullOrWhiteSpace(Host) ? "127.0.0.1" : Host.Trim();
+        Port = Math.Clamp(Port, 1, 65535);
+    }
+
+    public OscEndpointPreset Clone() => new() { Id = Id, Name = Name, Host = Host, Port = Port };
+
+    public override string ToString() => $"{Name} · {Host}:{Port}";
+}
+
+public sealed class OscOutputSettings
+{
+    public string DefaultEndpointId { get; set; } = string.Empty;
+    public List<OscEndpointPreset> Endpoints { get; set; } = [];
+
+    public void Normalize()
+    {
+        Endpoints ??= [];
+        foreach (var endpoint in Endpoints) endpoint.Normalize();
+        Endpoints = Endpoints
+            .GroupBy(endpoint => endpoint.Id, StringComparer.OrdinalIgnoreCase)
+            .Select(group => group.Last())
+            .ToList();
+        if (Endpoints.Count == 0)
+        {
+            Endpoints.Add(new OscEndpointPreset { Id = "local-8000", Name = "Local OSC", Host = "127.0.0.1", Port = 8000 });
+        }
+        if (Endpoints.All(endpoint => !endpoint.Id.Equals(DefaultEndpointId, StringComparison.OrdinalIgnoreCase)))
+            DefaultEndpointId = Endpoints[0].Id;
+    }
+
+    public OscEndpointPreset? Resolve(string? id) => Endpoints.FirstOrDefault(endpoint =>
+        endpoint.Id.Equals(string.IsNullOrWhiteSpace(id) ? DefaultEndpointId : id, StringComparison.OrdinalIgnoreCase));
+
+    public OscOutputSettings Clone() => new()
+    {
+        DefaultEndpointId = DefaultEndpointId,
+        Endpoints = Endpoints.Select(endpoint => endpoint.Clone()).ToList()
+    };
+}
+
 public sealed class RawInputPedalDefinition
 {
     public string Id { get; set; } = Guid.NewGuid().ToString("N");

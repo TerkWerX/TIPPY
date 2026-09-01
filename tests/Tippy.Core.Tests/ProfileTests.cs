@@ -64,7 +64,7 @@ public sealed class ProfileTests
 
         var loaded = new ProfileSerializer().Deserialize(json);
 
-        Assert.Equal(12, loaded.SchemaVersion);
+        Assert.Equal(13, loaded.SchemaVersion);
         Assert.All(loaded.Devices, device => Assert.Equal(2, device.ActiveBankIndex));
     }
 
@@ -230,7 +230,7 @@ public sealed class ProfileTests
         var serializer = new ProfileSerializer();
         var loaded = serializer.Deserialize(serializer.Serialize(profile));
 
-        Assert.Equal(12, loaded.SchemaVersion);
+        Assert.Equal(13, loaded.SchemaVersion);
         var learned = Assert.Single(loaded.LearnedPedals);
         Assert.Equal("Custom pedal", learned.Name);
         Assert.Equal(3, learned.Switches.Count);
@@ -378,6 +378,11 @@ public sealed class ProfileTests
             },
             Overlay = new OverlaySettings { Enabled = true, VisibleSeconds = 5, Left = 100, Top = 200 },
             Midi = new MidiOutputSettings { PreferredOutputName = "APC MINI" },
+            Osc = new OscOutputSettings
+            {
+                DefaultEndpointId = "obs",
+                Endpoints = [new OscEndpointPreset { Id = "obs", Name = "OBS", Host = "studio.local", Port = 4455 }]
+            },
             RawInputPedals =
             [
                 new RawInputPedalDefinition
@@ -418,11 +423,12 @@ public sealed class ProfileTests
         var serializer = new ProfileSerializer();
         var loaded = serializer.Deserialize(serializer.Serialize(profile));
 
-        Assert.Equal(12, loaded.SchemaVersion);
+        Assert.Equal(13, loaded.SchemaVersion);
         Assert.Equal("Tippy", Assert.Single(loaded.Variables).Value);
         Assert.Equal(45, loaded.Safety.MaximumMacroSeconds);
         Assert.True(loaded.Overlay.Enabled);
         Assert.Equal("APC MINI", loaded.Midi.PreferredOutputName);
+        Assert.Equal("studio.local", loaded.Osc.Resolve(null)?.Host);
         Assert.Equal(0x70, Assert.Single(Assert.Single(loaded.RawInputPedals).Switches).VirtualKey);
         Assert.Equal(PedalPatternType.Combination, Assert.Single(loaded.PedalPatterns).Type);
         Assert.True(loaded.Devices[0].Banks[0].Bindings[0].Gestures.Toggle);

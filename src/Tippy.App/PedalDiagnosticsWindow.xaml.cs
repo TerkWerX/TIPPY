@@ -22,6 +22,8 @@ public partial class PedalDiagnosticsWindow : Window
         EventsGrid.ItemsSource = _events;
     }
 
+    public event EventHandler? CertificationRequested;
+
     public void SetDevices(IReadOnlyCollection<PedalDeviceInfo> devices)
     {
         _devices = devices;
@@ -55,6 +57,8 @@ public partial class PedalDiagnosticsWindow : Window
         PressedCountText.Text = "0";
         LatencyText.Text = "—";
     }
+
+    private void Certification_Click(object sender, RoutedEventArgs e) => CertificationRequested?.Invoke(this, EventArgs.Empty);
 
     private void Export_Click(object sender, RoutedEventArgs e)
     {

@@ -6,6 +6,13 @@ Notable changes to Tippy are documented here.
 
 ### Added
 
+- Reusable named OSC endpoint presets, a live OSC packet test screen, preset-linked macro steps, and standards-tested integer/float/string packet encoding.
+- Full virtual Xbox analog output for both thumb sticks and triggers, with configurable intensity, one-shot neutral return, overlap-safe held ownership, and a combined digital/analog driver test.
+- A named-variable manager with add, duplicate, remove, token display, built-in values, and live macro-expansion previews.
+- Automated Hardware Passport grading with explicit functional/performance results, unplug-while-held synthetic-release certification, latency percentiles, and schema-2 certificate exports.
+- A physical hardware-in-the-loop station for ten-cycle soak tests, simultaneous input, reconnects, stuck-release cleanup, and HID-receipt-to-output-dispatch latency reports.
+- RSA-SHA256 support-pack publisher authentication, an HTTPS catalog browser, archive pinning, installed-version tracking, authenticated update delivery, bundled trust keys, and publisher signing tooling.
+
 - Complete foreground **Application Scenes** with independent three-bank assignment sets per pedal, optional window-title matching, current-bank capture, and backward-compatible migration from bank-only app profiles.
 - **Tippy Hardware Passport** certification for repeated switch operation, simultaneous inputs, clean releases, unplug/reconnect behavior, routing latency, privacy-safe report samples, descriptor fingerprints, and portable `.tippy-passport.json` export.
 - Portable per-device `.tippy-device.json` export/import for learned raw-HID mappings.
@@ -54,6 +61,8 @@ Notable changes to Tippy are documented here.
 - Added OBS Studio, Streamlabs Desktop, vMix, XSplit Broadcaster, and Wirecast paired bindings for scene/camera switching and live-production controls.
 
 ### Fixed
+
+- Checkbox captions now follow Tippy's theme-aware text brush and remain readable in dark mode.
 
 - Full-view window dimensions are now remembered independently for auto, stacked, side-by-side, tabbed, and each tiled column arrangement; returning to a layout restores the user's size without moving the window to another monitor.
 - Multi-row layouts now use a dense low-resolution presentation that keeps pedal photographs, action names, and Edit Assignment buttons usable while fitting a two-pedal stacked view into a 700-pixel-tall window.

@@ -9,9 +9,12 @@ public partial class SettingsWindow : Window
 {
     private readonly VirtualGamepadService _gamepad;
     private bool _capturing;
+    private List<TippyVariable> _variables = [];
+    private readonly string _profileName;
 
     public SettingsWindow(
         string bankHotkey,
+        string profileName,
         bool startMinimized,
         bool startWithWindows,
         bool checkForUpdates,
@@ -22,6 +25,7 @@ public partial class SettingsWindow : Window
     {
         InitializeComponent();
         BankHotkey = bankHotkey;
+        _profileName = profileName;
         _gamepad = gamepad;
         HotkeyBox.Text = bankHotkey;
         StartMinimizedCheckBox.IsChecked = startMinimized;
@@ -36,7 +40,8 @@ public partial class SettingsWindow : Window
         RepeatSecondsBox.Text = safety.MaximumRepeatSeconds.ToString();
         MaximumStepsBox.Text = safety.MaximumSteps.ToString();
         EmergencyHotkeyBox.Text = safety.EmergencyStopHotkey;
-        VariablesBox.Text = string.Join(Environment.NewLine, variables.Select(variable => $"{variable.Name}={variable.Value}"));
+        _variables = variables.Select(variable => new TippyVariable { Name = variable.Name, Value = variable.Value }).ToList();
+        UpdateVariableSummary();
         PreviewKeyDown += SettingsWindow_PreviewKeyDown;
     }
 
@@ -88,9 +93,12 @@ public partial class SettingsWindow : Window
         }
         try
         {
-            GamepadStatusText.Text = "Controller connected. Pulsing the A button…";
+            GamepadStatusText.Text = "Controller connected. Testing A, left stick, and both triggers…";
             await _gamepad.PulseAsync("A", 80, CancellationToken.None);
-            GamepadStatusText.Text = _gamepad.Status + " · test passed";
+            await _gamepad.PulseAxisAsync("Left X", 100, 140, CancellationToken.None);
+            await _gamepad.PulseAxisAsync("Left Trigger", 100, 100, CancellationToken.None);
+            await _gamepad.PulseAxisAsync("Right Trigger", 100, 100, CancellationToken.None);
+            GamepadStatusText.Text = _gamepad.Status + " · digital buttons, analog stick, and triggers passed";
         }
         catch (Exception exception)
         {
@@ -104,6 +112,18 @@ public partial class SettingsWindow : Window
         CaptureHotkeyButton.Content = "Change";
         HotkeyHint.Text = hint;
     }
+
+    private void ManageVariables_Click(object sender, RoutedEventArgs e)
+    {
+        var manager = new VariableManagerWindow(_variables, _profileName) { Owner = this };
+        if (manager.ShowDialog() != true) return;
+        _variables = manager.Result.Select(variable => new TippyVariable { Name = variable.Name, Value = variable.Value }).ToList();
+        UpdateVariableSummary();
+    }
+
+    private void UpdateVariableSummary() => VariablesSummaryText.Text = _variables.Count == 0
+        ? "No custom variables yet. Built-in date, time, app, profile, device, pedal, bank, and clipboard tokens remain available."
+        : $"{_variables.Count} custom variable{(_variables.Count == 1 ? string.Empty : "s")} · " + string.Join(", ", _variables.Take(4).Select(variable => $"{{{variable.Name}}}"));
 
     private void Save_Click(object sender, RoutedEventArgs e)
     {
@@ -123,19 +143,7 @@ public partial class SettingsWindow : Window
             Top = ParseDouble(OverlayTopBox.Text, 24)
         };
         Overlay.Normalize();
-        Variables = VariablesBox.Text.Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries)
-            .Select(line =>
-            {
-                var separator = line.IndexOf('=');
-                var variable = new TippyVariable
-                {
-                    Name = separator < 0 ? line : line[..separator],
-                    Value = separator < 0 ? string.Empty : line[(separator + 1)..]
-                };
-                variable.Normalize();
-                return variable;
-            }).GroupBy(variable => variable.Name, StringComparer.OrdinalIgnoreCase)
-            .Select(group => group.Last()).ToArray();
+        Variables = _variables.Select(variable => new TippyVariable { Name = variable.Name, Value = variable.Value }).ToArray();
         DialogResult = true;
     }
 

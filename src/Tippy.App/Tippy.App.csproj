@@ -10,7 +10,7 @@
     <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
     <AssemblyName>Tippy</AssemblyName>
     <RootNamespace>Tippy.App</RootNamespace>
-    <Version>0.5.0</Version>
+    <Version>0.6.0</Version>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <ApplicationIcon>Assets\Icons\tippy.ico</ApplicationIcon>
     <PublishSingleFile>true</PublishSingleFile>
@@ -42,6 +42,11 @@
     <Content Include="..\..\Claude\pedals\*.png" Link="PedalLibrary\%(Filename)%(Extension)"
              CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
     <Content Include="..\..\Claude\pedals\manifest.csv" Link="PedalLibrary\manifest.csv"
+             CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Include="..\..\pedal-packs\trusted-publishers.json" Link="PedalPacks\trusted-publishers.json"
              CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
   </ItemGroup>
 

@@ -50,13 +50,13 @@ The searchable catalog currently includes 557 commands across 32 Windows applica
 - Use two or more compatible USB pedals simultaneously with separate assignments.
 - Keep three independent banks on every pedal, or switch all pedals together.
 - Save, load, and copy portable `.tippy-bank.json` banks to any pedal with enough switches—including loading the same bank on several pedals.
-- Assign Windows actions, individual keys, key combinations, text strings, timed recordings, delays, mouse actions, program launches, and optional Xbox 360 gamepad buttons.
+- Assign Windows actions, individual keys, key combinations, text strings, timed recordings, delays, mouse actions, program launches, and optional Xbox 360 buttons, thumb sticks, and analog triggers.
 - Give every switch independent press and release actions, or hold keyboard/gamepad output until physical release.
 - Hold a pedal as a momentary shift layer so the other switches temporarily use another bank.
 - Assign separate double-tap and long-press actions, repeat a command while held, or turn a held action into a safe toggle.
 - Build cross-device foot combinations and ordered foot sequences manually or record them by pressing the real pedals.
 - Load complete three-bank Application Scenes automatically for the foreground executable or a matching window title, resolved only when a pedal is pressed.
-- Send MIDI notes/CC/program changes and OSC messages to DAWs, streaming tools, lighting software, and other creative applications.
+- Send MIDI notes/CC/program changes and OSC messages to DAWs, streaming tools, lighting software, and other creative applications; OSC includes reusable endpoint presets and a live packet tester.
 - Hold continuous cursor movement, vertical/horizontal scrolling, and mouse-button drags underfoot.
 - Arrange pedal cards automatically, stacked, side by side, or in a tile grid with automatic or 1–6-column placement.
 - Click the always-visible **Compact view** button (or press `F11`) for a distinct pedal-only view that hides the full menus, preserves full-size pedal artwork, and shows one pedal at a time with tabs when several are connected. **Full view**, `Esc`, or `F11` restores the complete interface.
@@ -67,13 +67,13 @@ The searchable catalog currently includes 557 commands across 32 Windows applica
 - Switch between dark and light themes.
 - Send Tippy to the system tray while its pedal assignments continue running.
 - Learn unknown USB HID pedals without a driver or code change.
-- Certify real hardware with Tippy Hardware Passport and export privacy-safe switch, simultaneous-input, reconnect, descriptor, and latency evidence.
+- Certify real hardware with automated Tippy Hardware Passport grading, then run the HIL station for physical soak, hot-plug, unplug-while-held cleanup, and press-to-output dispatch evidence.
 - Export or import one learned pedal as a portable `.tippy-device.json` definition without moving an entire profile.
 - Use the bundled registry-driven artwork library, choose a picture manually for any device, and preserve unknown VID/PID details for future compatibility updates.
 - Learn keyboard-emulating pedals through device-specific Windows Raw Input without remapping the user's main keyboard.
 - Preview assignments without producing output in Rehearsal Mode.
 - Show an optional click-through active-bank/action overlay and inspect raw events, simultaneous switches, and routing latency in Live Diagnostics.
-- Keep automatic profile backups, restore earlier setups, run portably from a USB drive, and install checksum-verified pedal support packs.
+- Keep automatic profile backups, restore earlier setups, run portably from a USB drive, and browse authenticated, checksum-pinned pedal support packs with update delivery.
 - Start automatically with Windows, recover from an unclean exit before pedal input starts, and optionally check GitHub for new releases.
 - Find every advanced capability from the searchable **Features** center.
 - Hot-plug devices without restarting Tippy.
@@ -107,7 +107,7 @@ Assign **Switch to next bank** for hands-free cycling, or **Hold for temporary b
 
 The advanced behavior panel on every assignment can add a double-tap or long-press action, repeat the press action, or toggle a held action. Timing is adjustable per switch, and Tippy rejects ambiguous combinations such as toggle-plus-double-tap instead of guessing. Under **Tools**, foot patterns can combine switches across multiple pedals or recognize an ordered sequence. **Capture with feet** records the pattern from the connected hardware.
 
-The macro editor also supports continuous mouse movement and scrolling, MIDI note-on/note-off, CC, and program-change messages, plus OSC output. **Tools → MIDI output setup** selects a specific Windows MIDI endpoint and sends a real note-on/note-off test. Text and program fields can use `{date}`, `{time}`, `{clipboard}`, `{app}`, `{profile}`, `{device}`, `{pedal}`, `{bank}`, and custom `name=value` profile variables.
+The macro editor also supports continuous mouse movement and scrolling, full Xbox analog stick/trigger positions, MIDI note-on/note-off, CC, and program-change messages, plus OSC output. **Tools → MIDI output setup** selects and tests a Windows MIDI endpoint; **Tools → OSC endpoints & test** manages reusable destinations and sends a real packet. Text and program fields can use `{date}`, `{time}`, `{clipboard}`, `{app}`, `{profile}`, `{device}`, `{pedal}`, `{bank}`, and custom named values managed through a live-preview variable editor.
 
 Tippy autosaves its live profile here:
 
@@ -138,11 +138,11 @@ Tippy also ships a data-driven pedal picture registry. The shared `VID_05F3/PID_
 
 Tippy enforces configurable limits on macro duration, repeat duration, and step count. The default emergency stop is `Ctrl+Alt+Escape`; it cancels playback and releases held keyboard, mouse, and gamepad state. Live Diagnostics keeps at most 500 recent raw pedal events in memory and can export a privacy-safe support report containing device descriptors and timing—never typed text or macro contents.
 
-Automatic profile backups are retained under the active Tippy data directory. After an unclean exit, Tippy offers the newest backup before it starts listening for pedal input and writes exception details under `%LOCALAPPDATA%\Tippy\Logs`. Portable mode is enabled from **Features → Profile backups & portable mode** and takes effect after restarting. Checksum-verified `.tippy-pedal-pack.zip` libraries can update identity data and artwork without installing executable plug-ins. See [advanced interactions](docs/ADVANCED_INTERACTIONS.md) and the [pedal support-pack format](docs/PEDAL_SUPPORT_PACKS.md).
+Automatic profile backups are retained under the active Tippy data directory. After an unclean exit, Tippy offers the newest backup before it starts listening for pedal input and writes exception details under `%LOCALAPPDATA%\Tippy\Logs`. Portable mode is enabled from **Features → Profile backups & portable mode** and takes effect after restarting. Authenticated `.tippy-pedal-pack.zip` libraries can update identity data and artwork without installing executable plug-ins; catalog packs require a trusted RSA publisher signature as well as archive and per-file SHA-256 checks. See [advanced interactions](docs/ADVANCED_INTERACTIONS.md), [hardware test station](docs/HARDWARE_TEST_STATION.md), and the [pedal support-pack format](docs/PEDAL_SUPPORT_PACKS.md).
 
 ## Gamepad output and game rules
 
-Keyboard and mouse output works through the Windows `SendInput` API. Genuine XInput output requires an existing ViGEmBus 1.22 installation; Tippy can detect and test it under **Settings** but does not install a kernel driver.
+Keyboard and mouse output works through the Windows `SendInput` API. Genuine XInput buttons, both thumb sticks, and both analog triggers require an existing ViGEmBus 1.22 installation; Tippy can detect and exercise all three output classes under **Settings** but does not install a kernel driver.
 
 Some games and anti-cheat systems reject injected input. A conservative gameplay setup maps one pedal press to one ordinary key. Timed or multi-step automation may be prohibited even in casual modes, so the game's rules always take precedence.
 
@@ -183,6 +183,7 @@ src/Tippy.App/          WPF interface, HID service, input playback, and catalogs
 src/Tippy.Core/         Profiles, banks, macro models, and report decoders
 tests/Tippy.Core.Tests/ Decoder and profile tests
 tools/Tippy.DeviceProbe HID discovery and protocol diagnostic tool
+pedal-packs/             Authenticated publisher trust and update catalog
 assets/                 Mascot, branding, pedal art, and Windows icon suite
 docs/                   Protocol notes and project screenshots
 ```

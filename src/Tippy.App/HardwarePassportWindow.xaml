@@ -37,10 +37,12 @@
                     <TextBlock x:Name="EverySwitchText" Text="○ Press and release every switch twice" Margin="0,13,0,0" TextWrapping="Wrap"/>
                     <TextBlock x:Name="TogetherText" Text="○ Press at least two switches together" Margin="0,11,0,0" TextWrapping="Wrap"/>
                     <TextBlock x:Name="ReconnectText" Text="○ Unplug and reconnect the pedal" Margin="0,11,0,0" TextWrapping="Wrap"/>
+                    <TextBlock x:Name="UnplugHeldText" Text="○ Unplug once while a switch is held" Margin="0,11,0,0" TextWrapping="Wrap"/>
                     <TextBlock x:Name="ReleaseText" Text="○ Finish with every switch released" Margin="0,11,0,0" TextWrapping="Wrap"/>
+                    <TextBlock x:Name="PerformanceText" Text="○ Meet the routing-latency target" Margin="0,11,0,0" TextWrapping="Wrap"/>
                     <Separator Margin="0,16,0,13"/>
                     <TextBlock Text="Instructions" FontWeight="SemiBold"/>
-                    <TextBlock Text="1. Press and release each switch at least twice.&#x0a;2. Hold two or more switches at the same time.&#x0a;3. Release everything, unplug the pedal, and reconnect it."
+                    <TextBlock Text="1. Press and release each switch at least twice.&#x0a;2. Hold two or more switches together.&#x0a;3. While holding one switch, unplug the pedal. Tippy must synthesize its release.&#x0a;4. Reconnect and finish released. Tippy grades the timing automatically."
                                Style="{StaticResource SmallMutedText}" TextWrapping="Wrap" Margin="0,6,0,0"/>
                 </StackPanel>
             </Border>
@@ -61,7 +63,7 @@
                        Style="{StaticResource SmallMutedText}" VerticalAlignment="Center"/>
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
                 <Button x:Name="ExportButton" Content="Export passport" Click="Export_Click" IsEnabled="False" Margin="0,0,8,0"/>
-                <Button Content="Close" IsCancel="True"/>
+                <Button Content="Close" Click="Close_Click"/>
             </StackPanel>
         </Grid>
     </Grid>

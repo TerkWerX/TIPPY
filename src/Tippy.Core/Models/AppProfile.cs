@@ -18,7 +18,7 @@ public enum PedalLayoutMode
 public sealed class AppProfile
 {
     public const int MaxBanks = 3;
-    public int SchemaVersion { get; set; } = 12;
+    public int SchemaVersion { get; set; } = 13;
     public string Name { get; set; } = "Default";
     public AppTheme Theme { get; set; } = AppTheme.Dark;
     public int ActiveBankIndex { get; set; }
@@ -39,6 +39,7 @@ public sealed class AppProfile
     public MacroSafetySettings Safety { get; set; } = new();
     public OverlaySettings Overlay { get; set; } = new();
     public MidiOutputSettings Midi { get; set; } = new();
+    public OscOutputSettings Osc { get; set; } = new();
     public List<RawInputPedalDefinition> RawInputPedals { get; set; } = [];
     public WindowPlacementSettings WindowPlacement { get; set; } = new();
     public Dictionary<string, LayoutWindowSizeSettings> LayoutWindowSizes { get; set; } =
@@ -47,7 +48,7 @@ public sealed class AppProfile
     public void Normalize()
     {
         var previousSchema = SchemaVersion;
-        SchemaVersion = 12;
+        SchemaVersion = 13;
         Name = string.IsNullOrWhiteSpace(Name) ? "Default" : Name.Trim();
         ActiveBankIndex = Math.Clamp(ActiveBankIndex, 0, MaxBanks - 1);
         BankHotkey = string.IsNullOrWhiteSpace(BankHotkey) ? "Ctrl+Alt+B" : BankHotkey.Trim();
@@ -62,6 +63,7 @@ public sealed class AppProfile
         Safety ??= new MacroSafetySettings();
         Overlay ??= new OverlaySettings();
         Midi ??= new MidiOutputSettings();
+        Osc ??= new OscOutputSettings();
         RawInputPedals ??= [];
         WindowPlacement ??= new WindowPlacementSettings();
         LayoutWindowSizes ??= new Dictionary<string, LayoutWindowSizeSettings>(StringComparer.OrdinalIgnoreCase);
@@ -78,6 +80,7 @@ public sealed class AppProfile
         Safety.Normalize();
         Overlay.Normalize();
         Midi.Normalize();
+        Osc.Normalize();
         foreach (var rawInputPedal in RawInputPedals) rawInputPedal.Normalize();
         WindowPlacement.Normalize();
         var normalizedLayoutSizes = new Dictionary<string, LayoutWindowSizeSettings>(StringComparer.OrdinalIgnoreCase);

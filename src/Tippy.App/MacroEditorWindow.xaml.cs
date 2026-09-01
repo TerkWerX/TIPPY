@@ -21,6 +21,7 @@ public partial class MacroEditorWindow : Window
     private readonly IReadOnlyList<KnownWindowsAction> _windowsShortcuts;
     private readonly IReadOnlyList<KnownWindowsAction> _keyboardKeys;
     private readonly IReadOnlyList<ApplicationShortcutProfile> _applications = ApplicationShortcutCatalog.Create();
+    private readonly OscOutputSettings _oscSettings;
     private readonly Stopwatch _recordingClock = new();
     private readonly HashSet<Key> _recordedDown = [];
     private ICollectionView? _actionsView;
@@ -32,17 +33,20 @@ public partial class MacroEditorWindow : Window
     private bool _recording;
     private long _lastRecordedMilliseconds;
 
-    public MacroEditorWindow(PedalBinding source) : this(source, false, null)
+    public MacroEditorWindow(PedalBinding source, OscOutputSettings? oscSettings = null) : this(source, false, null, oscSettings)
     {
     }
 
-    private MacroEditorWindow(PedalBinding source, bool releaseOnly, string? gestureTarget = null)
+    private MacroEditorWindow(PedalBinding source, bool releaseOnly, string? gestureTarget = null,
+        OscOutputSettings? oscSettings = null)
     {
         _knownActions = WindowsActionCatalog.Create();
         _windowsShortcuts = _knownActions.Where(action => !action.IsDirectKey).ToArray();
         _keyboardKeys = _knownActions.Where(action => action.IsDirectKey).ToArray();
         _releaseOnly = releaseOnly;
         _gestureTarget = gestureTarget;
+        _oscSettings = oscSettings?.Clone() ?? new OscOutputSettings();
+        _oscSettings.Normalize();
         _working = source.Clone();
         _working.Normalize();
         Result = source.Clone();
@@ -513,25 +517,67 @@ public partial class MacroEditorWindow : Window
         if (address is null) return;
         var values = PromptDialog.Ask(this, "OSC values", "Comma-separated text, integer, or decimal values", "1");
         if (values is null) return;
-        var endpoint = PromptDialog.Ask(this, "OSC destination", "Host:port", "127.0.0.1:8000");
-        if (endpoint is null) return;
-        var separator = endpoint.LastIndexOf(':');
-        var host = separator > 0 ? endpoint[..separator] : endpoint;
-        var port = separator > 0 && int.TryParse(endpoint[(separator + 1)..], out var parsed) ? parsed : 8000;
+        var choices = _oscSettings.Endpoints.Select(endpoint => endpoint.ToString()).Append("Custom endpoint…").ToArray();
+        var selected = PromptDialog.Choose(this, "OSC destination", "Reusable endpoint preset", choices);
+        if (selected is null) return;
+        OscEndpointPreset? preset = null;
+        string host;
+        int port;
+        if (selected == "Custom endpoint…")
+        {
+            var endpoint = PromptDialog.Ask(this, "OSC destination", "Host:port", "127.0.0.1:8000");
+            if (endpoint is null) return;
+            var separator = endpoint.LastIndexOf(':');
+            host = separator > 0 ? endpoint[..separator] : endpoint;
+            port = separator > 0 && int.TryParse(endpoint[(separator + 1)..], out var parsed) ? parsed : 8000;
+        }
+        else
+        {
+            preset = _oscSettings.Endpoints.First(endpoint => endpoint.ToString() == selected);
+            host = preset.Host;
+            port = preset.Port;
+        }
         CurrentMacro.Steps.Add(new MacroStep
         {
             Type = MacroStepType.Osc, Value = address, Arguments = values,
-            WorkingDirectory = host, Amount = Math.Clamp(port, 1, 65535)
+            WorkingDirectory = host, Amount = Math.Clamp(port, 1, 65535), EndpointPresetId = preset?.Id
         });
         RefreshSteps(CurrentMacro.Steps.Count - 1);
     }
 
     private void AddGamepad_Click(object sender, RoutedEventArgs e)
     {
-        var choice = PromptDialog.Choose(this, "Gamepad button", "Virtual Xbox 360 button",
-            ["A", "B", "X", "Y", "LB", "RB", "Back", "Start", "L3", "R3", "DPad Up", "DPad Down", "DPad Left", "DPad Right"]);
+        var choice = PromptDialog.Choose(this, "Virtual gamepad", "Xbox 360 button, stick direction, or trigger",
+            ["A", "B", "X", "Y", "LB", "RB", "Back", "Start", "L3", "R3", "DPad Up", "DPad Down", "DPad Left", "DPad Right",
+             "Left stick left", "Left stick right", "Left stick up", "Left stick down",
+             "Right stick left", "Right stick right", "Right stick up", "Right stick down", "Left trigger", "Right trigger"]);
         if (choice is null) return;
-        CurrentMacro.Steps.Add(new MacroStep { Type = MacroStepType.GamepadButton, Value = choice, DurationMs = 25 });
+        var analog = choice.Contains("stick", StringComparison.OrdinalIgnoreCase) ||
+                     choice.Contains("trigger", StringComparison.OrdinalIgnoreCase);
+        if (!analog)
+        {
+            CurrentMacro.Steps.Add(new MacroStep { Type = MacroStepType.GamepadButton, Value = choice, DurationMs = 25 });
+            RefreshSteps(CurrentMacro.Steps.Count - 1);
+            return;
+        }
+        var intensityText = PromptDialog.Ask(this, "Analog intensity", "Percentage from 1 to 100", "100");
+        if (intensityText is null) return;
+        if (!int.TryParse(intensityText, out var intensity) || intensity is < 1 or > 100)
+        {
+            MessageBox.Show(this, "Enter a whole-number intensity from 1 to 100.", "Virtual gamepad",
+                MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+        var (axis, sign) = choice switch
+        {
+            "Left stick left" => ("Left X", -1), "Left stick right" => ("Left X", 1),
+            "Left stick up" => ("Left Y", 1), "Left stick down" => ("Left Y", -1),
+            "Right stick left" => ("Right X", -1), "Right stick right" => ("Right X", 1),
+            "Right stick up" => ("Right Y", 1), "Right stick down" => ("Right Y", -1),
+            "Left trigger" => ("Left Trigger", 1), _ => ("Right Trigger", 1)
+        };
+        CurrentMacro.Steps.Add(new MacroStep
+            { Type = MacroStepType.GamepadAxis, Value = axis, Amount = intensity * sign, DurationMs = 100 });
         RefreshSteps(CurrentMacro.Steps.Count - 1);
     }
 
@@ -559,7 +605,7 @@ public partial class MacroEditorWindow : Window
     private void EditReleaseAction_Click(object sender, RoutedEventArgs e)
     {
         _working.Macro.Name = string.IsNullOrWhiteSpace(NameBox.Text) ? "Unnamed macro" : NameBox.Text.Trim();
-        var editor = new MacroEditorWindow(_working, true)
+        var editor = new MacroEditorWindow(_working, true, null, _oscSettings)
         {
             Owner = this,
             Title = $"Release action · {Title}"
@@ -576,7 +622,7 @@ public partial class MacroEditorWindow : Window
     private void EditGesture(string target)
     {
         _working.Macro.Name = string.IsNullOrWhiteSpace(NameBox.Text) ? "Unnamed macro" : NameBox.Text.Trim();
-        var editor = new MacroEditorWindow(_working, false, target)
+        var editor = new MacroEditorWindow(_working, false, target, _oscSettings)
         {
             Owner = this,
             Title = $"{(target == "double" ? "Double tap" : "Long press")} · {Title}"
@@ -728,7 +774,7 @@ public partial class MacroEditorWindow : Window
         }
         if (_working.Type == PedalBindingType.Macro &&
             _working.Macro.TriggerMode == MacroTriggerMode.WhileHeld &&
-            _working.Macro.Steps.Any(step => step.Type is not (MacroStepType.KeyChord or MacroStepType.KeyDown or MacroStepType.GamepadButton or MacroStepType.MouseButton or MacroStepType.MouseMove or MacroStepType.MouseWheel)))
+            _working.Macro.Steps.Any(step => step.Type is not (MacroStepType.KeyChord or MacroStepType.KeyDown or MacroStepType.GamepadButton or MacroStepType.GamepadAxis or MacroStepType.MouseButton or MacroStepType.MouseMove or MacroStepType.MouseWheel)))
         {
             MessageBox.Show(this,
                 "Hold-until-release actions support keyboard, gamepad, mouse-button, mouse-movement, and scrolling steps. Remove text, waits, program, MIDI, and OSC steps, or choose Run once.",

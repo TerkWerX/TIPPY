@@ -4,6 +4,8 @@ using Tippy.Core.Models;
 
 namespace Tippy.App.Services;
 
+public sealed record MacroOutputEventArgs(string TriggerId, string OutputKind, long DispatchedTimestamp);
+
 public sealed class MacroPlayer : IDisposable
 {
     private readonly WindowsInputService _input;
@@ -11,6 +13,7 @@ public sealed class MacroPlayer : IDisposable
     private readonly MidiOutputService _midi = new();
     private readonly OscOutputService _osc = new();
     private readonly HeldOutputLedger _outputs = new();
+    private readonly GamepadAnalogLedger _analogOutputs = new();
     private readonly HashSet<string> _activeHeldOwners = new(StringComparer.Ordinal);
     private readonly Dictionary<string, string[]> _heldMouseOwners = new(StringComparer.Ordinal);
     private readonly Dictionary<string, int> _heldMouseCounts = new(StringComparer.OrdinalIgnoreCase);
@@ -29,6 +32,7 @@ public sealed class MacroPlayer : IDisposable
     }
 
     public event EventHandler<string>? PlaybackError;
+    public event EventHandler<MacroOutputEventArgs>? OutputDispatched;
 
     public void ConfigureSafety(MacroSafetySettings settings)
     {
@@ -43,6 +47,7 @@ public sealed class MacroPlayer : IDisposable
     }
 
     public void ConfigureMidi(MidiOutputSettings settings) => _midi.Configure(settings);
+    public void ConfigureOsc(OscOutputSettings settings) => _osc.Configure(settings);
 
     public void Handle(string triggerId, MacroDefinition macro, bool isPressed)
     {
@@ -79,7 +84,7 @@ public sealed class MacroPlayer : IDisposable
         }
         else if (oneShot is not null)
         {
-            _ = PlayOnceAsync(oneShot, playbackToken);
+            _ = PlayOnceAsync(triggerId, oneShot, playbackToken);
         }
     }
 
@@ -101,6 +106,7 @@ public sealed class MacroPlayer : IDisposable
             _activeHeldOwners.Clear();
             ReleaseAllMouseAndContinuous();
             TryApplyDelta(_outputs.ReleaseAll());
+            TryApplyAnalog(_analogOutputs.ReleaseAll());
         }
     }
 
@@ -121,6 +127,7 @@ public sealed class MacroPlayer : IDisposable
             _activeHeldOwners.Clear();
             ReleaseAllMouseAndContinuous();
             TryApplyDelta(_outputs.ReleaseAll());
+            TryApplyAnalog(_analogOutputs.ReleaseAll());
         }
     }
 
@@ -147,6 +154,9 @@ public sealed class MacroPlayer : IDisposable
                 .Select(step => step.Value ?? "A")
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .ToArray();
+            var axes = macro.Steps.Where(step => step.Type == MacroStepType.GamepadAxis).ToArray();
+            var mouseButtons = macro.Steps.Where(step => step.Type == MacroStepType.MouseButton)
+                .Select(step => step.Value ?? "Left").ToArray();
             try
             {
                 lock (_outputGate)
@@ -157,11 +167,13 @@ public sealed class MacroPlayer : IDisposable
                     }
                     ThrowIfInputPaused(token);
                     ApplyDelta(_outputs.Acquire(ownerId, keys, buttons));
-                    AcquireMouseButtons(ownerId, macro.Steps
-                        .Where(step => step.Type == MacroStepType.MouseButton)
-                        .Select(step => step.Value ?? "Left"));
+                    foreach (var step in axes)
+                        ApplyAnalog(_analogOutputs.Acquire(ownerId, step.Value ?? "Left X", step.Amount));
+                    AcquireMouseButtons(ownerId, mouseButtons);
                 }
-                StartContinuous(ownerId, macro, token);
+                StartContinuous(ownerId, macro, token, triggerId);
+                if (keys.Length > 0 || buttons.Length > 0 || axes.Length > 0 || mouseButtons.Length > 0)
+                    RaiseOutput(triggerId, "held action");
             }
             catch (OperationCanceledException)
             {
@@ -170,6 +182,7 @@ public sealed class MacroPlayer : IDisposable
                     _activeHeldOwners.Remove(ownerId);
                     ReleaseMouseAndContinuous(ownerId);
                     TryApplyDelta(_outputs.ReleaseOwner(ownerId));
+                    TryApplyAnalog(_analogOutputs.ReleaseOwner(ownerId));
                 }
             }
             catch (Exception exception)
@@ -179,6 +192,7 @@ public sealed class MacroPlayer : IDisposable
                     _activeHeldOwners.Remove(ownerId);
                     ReleaseMouseAndContinuous(ownerId);
                     TryApplyDelta(_outputs.ReleaseOwner(ownerId));
+                    TryApplyAnalog(_analogOutputs.ReleaseOwner(ownerId));
                 }
                 PlaybackError?.Invoke(this, exception.Message);
             }
@@ -189,7 +203,7 @@ public sealed class MacroPlayer : IDisposable
         }
     }
 
-    private async Task PlayOnceAsync(MacroDefinition macro, CancellationToken token)
+    private async Task PlayOnceAsync(string triggerId, MacroDefinition macro, CancellationToken token)
     {
         var ownerId = $"play:{Guid.NewGuid():N}";
         using var safetyCancellation = CancellationTokenSource.CreateLinkedTokenSource(token);
@@ -206,6 +220,7 @@ public sealed class MacroPlayer : IDisposable
                 {
                     case MacroStepType.KeyChord:
                         Acquire(ownerId, step.Keys, [], token);
+                        RaiseOutput(triggerId, "keyboard");
                         try
                         {
                             await Task.Delay(Math.Clamp(step.DurationMs, 1, 5_000), token).ConfigureAwait(false);
@@ -217,21 +232,27 @@ public sealed class MacroPlayer : IDisposable
                         break;
                     case MacroStepType.KeyDown:
                         Acquire(ownerId, step.Keys, [], token);
+                        RaiseOutput(triggerId, "keyboard");
                         break;
                     case MacroStepType.KeyUp:
                         Release(ownerId, step.Keys, []);
+                        RaiseOutput(triggerId, "keyboard");
                         break;
                     case MacroStepType.Text:
                         ExecuteInjection(token, () => _input.TypeText(step.Value ?? string.Empty));
+                        RaiseOutput(triggerId, "text");
                         break;
                     case MacroStepType.MouseButton:
                         ExecuteInjection(token, () => _input.MouseClick(step.Value ?? "Left"));
+                        RaiseOutput(triggerId, "mouse");
                         break;
                     case MacroStepType.MouseWheel:
                         ExecuteInjection(token, () => ScrollMouse(step));
+                        RaiseOutput(triggerId, "mouse");
                         break;
                     case MacroStepType.MouseMove:
                         ExecuteInjection(token, () => MoveMouse(step));
+                        RaiseOutput(triggerId, "mouse");
                         break;
                     case MacroStepType.Delay:
                         await Task.Delay(Math.Clamp(step.DurationMs, 0, 60_000), token).ConfigureAwait(false);
@@ -239,6 +260,7 @@ public sealed class MacroPlayer : IDisposable
                     case MacroStepType.GamepadButton:
                         var button = step.Value ?? "A";
                         Acquire(ownerId, [], [button], token);
+                        RaiseOutput(triggerId, "gamepad button");
                         try
                         {
                             await Task.Delay(Math.Clamp(step.DurationMs, 1, 5_000), token).ConfigureAwait(false);
@@ -248,15 +270,34 @@ public sealed class MacroPlayer : IDisposable
                             Release(ownerId, [], [button]);
                         }
                         break;
+                    case MacroStepType.GamepadAxis:
+                        lock (_outputGate)
+                        {
+                            ThrowIfInputPaused(token);
+                            ApplyAnalog(_analogOutputs.Acquire(ownerId, step.Value ?? "Left X", step.Amount));
+                        }
+                        RaiseOutput(triggerId, "gamepad analog");
+                        try
+                        {
+                            await Task.Delay(Math.Clamp(step.DurationMs, 1, 5_000), token).ConfigureAwait(false);
+                        }
+                        finally
+                        {
+                            lock (_outputGate)
+                                ApplyAnalog(_analogOutputs.Release(ownerId, step.Value ?? "Left X"));
+                        }
+                        break;
                     case MacroStepType.LaunchProgram:
                         ExecuteInjection(token, () => LaunchProgram(step));
+                        RaiseOutput(triggerId, "program");
                         break;
                     case MacroStepType.Midi:
                         ExecuteInjection(token, () => _midi.Send(step.Value ?? string.Empty));
+                        RaiseOutput(triggerId, "MIDI");
                         break;
                     case MacroStepType.Osc:
-                        ExecuteInjection(token, () => _osc.Send(step.WorkingDirectory ?? "127.0.0.1",
-                            step.Amount == 0 ? 8000 : step.Amount, step.Value ?? "/tippy", step.Arguments));
+                        ExecuteInjection(token, () => _osc.Send(step));
+                        RaiseOutput(triggerId, "OSC");
                         break;
                 }
             }
@@ -328,7 +369,7 @@ public sealed class MacroPlayer : IDisposable
         });
     }
 
-    private void StartContinuous(string ownerId, MacroDefinition macro, CancellationToken playbackToken)
+    private void StartContinuous(string ownerId, MacroDefinition macro, CancellationToken playbackToken, string triggerId)
     {
         var steps = macro.Steps.Where(step => step.Type is MacroStepType.MouseMove or MacroStepType.MouseWheel).ToArray();
         if (steps.Length == 0) return;
@@ -345,6 +386,7 @@ public sealed class MacroPlayer : IDisposable
         }
         _ = Task.Run(async () =>
         {
+            var reported = false;
             try
             {
                 while (!cancellation.IsCancellationRequested)
@@ -353,6 +395,11 @@ public sealed class MacroPlayer : IDisposable
                     {
                         if (step.Type == MacroStepType.MouseMove) ExecuteInjection(cancellation.Token, () => MoveMouse(step));
                         else ExecuteInjection(cancellation.Token, () => ScrollMouse(step));
+                        if (!reported)
+                        {
+                            RaiseOutput(triggerId, "mouse continuous");
+                            reported = true;
+                        }
                     }
                     var delay = steps.Any(step => step.Type == MacroStepType.MouseWheel)
                         ? Math.Clamp(steps.Max(step => step.DurationMs), 40, 1_000)
@@ -449,6 +496,7 @@ public sealed class MacroPlayer : IDisposable
                 _activeHeldOwners.Remove(ownerId);
                 ReleaseMouseAndContinuous(ownerId);
                 ApplyDelta(_outputs.ReleaseOwner(ownerId));
+                ApplyAnalog(_analogOutputs.ReleaseOwner(ownerId));
             }
         }
         catch (Exception exception)
@@ -497,6 +545,22 @@ public sealed class MacroPlayer : IDisposable
         catch { }
     }
 
+    private void ApplyAnalog(IEnumerable<GamepadAnalogChange> changes)
+    {
+        foreach (var change in changes) _gamepad.SetAxis(change.Axis, change.Value);
+    }
+
+    private void TryApplyAnalog(IEnumerable<GamepadAnalogChange> changes)
+    {
+        try { ApplyAnalog(changes); } catch { }
+    }
+
+    private void RaiseOutput(string triggerId, string kind)
+    {
+        try { OutputDispatched?.Invoke(this, new MacroOutputEventArgs(triggerId, kind, Stopwatch.GetTimestamp())); }
+        catch { }
+    }
+
     private static string HeldOwnerId(string triggerId) => $"held:{triggerId}";
 
     private static void ValidateKeys(MacroDefinition macro)
@@ -527,6 +591,7 @@ public sealed class MacroPlayer : IDisposable
             _activeHeldOwners.Clear();
             ReleaseAllMouseAndContinuous();
             TryApplyDelta(_outputs.ReleaseAll());
+            TryApplyAnalog(_analogOutputs.ReleaseAll());
         }
         _midi.Dispose();
         _osc.Dispose();

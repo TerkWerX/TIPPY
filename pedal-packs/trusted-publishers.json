@@ -1,0 +1,9 @@
+{
+  "publishers": [
+    {
+      "id": "terkwerx-official-2026",
+      "name": "TerkWerX",
+      "public_key_pem": "-----BEGIN PUBLIC KEY-----\nMIIBojANBgkqhkiG9w0BAQEFAAOCAY8AMIIBigKCAYEAvq2T1dzWjbdmPbn0d+X+\n02bEB0k4hQ3p4a2Y+xHjC1uYWBU/BWQZGp0wwW7Uf/R56/A3NqP4b490tb27WE10\neVNBz8QJRkdSKcANWIWgMu78N5NnqBNde4H4tbmYxtjVs/LianMh/bjuioYj3PkS\nV46ofDGCtNJM+NfPr38dEybg0H4NnUXJOhjNOoWBFusxqgPKC5kH3ARgDBbOaeJy\nBPo9SVm98R+CPPDPHOrLv0xmNwsSI119b3JxV6BypwBt/yQG768Sn+hakJdz4588\n4hRYkaPvLqZx90cAThJzxAVwu2lhuk6+9TJPCvUJlbw5ONmJDw2o8iR7fVnygCpH\nTTpQyvkQeeolsXN/C4qZLveMuykCoD+AbCNusebaJjupB5uwLCQFqwdv7DoBOwdX\n+7D42vOZxhkcuY3iRWhulchV9y3QMNMJr9de5qIZKC5/h7mP69Igg2s7pY0vLsk/\nKoLVT2cqeScKaHF8fOWohMktCmpYpSyKcWeAfwB0qkS1AgMBAAE=\n-----END PUBLIC KEY-----"
+    }
+  ]
+}

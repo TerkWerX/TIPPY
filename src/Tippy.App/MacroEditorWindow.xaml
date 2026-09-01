@@ -348,7 +348,7 @@
                             <TabItem.Header><TextBlock Text="Mouse &amp; gamepad" Foreground="#111820"/></TabItem.Header>
                             <WrapPanel Margin="10">
                                 <Button Content="Mouse button, movement, or scroll" Click="AddMouse_Click" Margin="0,0,8,0"/>
-                                <Button Content="Virtual gamepad button" Click="AddGamepad_Click"/>
+                                <Button Content="Virtual gamepad" Click="AddGamepad_Click"/>
                             </WrapPanel>
                         </TabItem>
                         <TabItem>

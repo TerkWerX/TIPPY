@@ -66,6 +66,7 @@ public partial class MainWindow : Window
     private bool _artworkPickerOpen;
     private PedalDiagnosticsWindow? _diagnosticsWindow;
     private HardwarePassportWindow? _passportWindow;
+    private HardwareTestStationWindow? _hardwareStationWindow;
     private AdvancedFeaturesWindow? _advancedFeaturesWindow;
     private StatusOverlayWindow? _overlayWindow;
     private bool _rehearsalMode;
@@ -94,6 +95,7 @@ public partial class MainWindow : Window
         InitializeTrayIcon();
         _macroPlayer = new MacroPlayer(new WindowsInputService(), _gamepad);
         _macroPlayer.ConfigureMidi(_profile.Midi);
+        _macroPlayer.ConfigureOsc(_profile.Osc);
         _gestureEngine.Invoked += GestureEngine_Invoked;
         Loaded += MainWindow_Loaded;
         Closed += MainWindow_Closed;
@@ -108,6 +110,8 @@ public partial class MainWindow : Window
         _rawInput.KeyChanged += RawInput_KeyChanged;
         _rawInput.DevicesChanged += (_, _) => Dispatcher.BeginInvoke(new Action(SyncRawInputDevices));
         _macroPlayer.PlaybackError += (_, error) => Dispatcher.Invoke(() => SetStatus(error, true));
+        _macroPlayer.OutputDispatched += (_, output) => Dispatcher.BeginInvoke(new Action(() =>
+            _hardwareStationWindow?.RecordOutput(output)));
         SystemEvents.SessionSwitch += SystemEvents_SessionSwitch;
         SystemEvents.PowerModeChanged += SystemEvents_PowerModeChanged;
     }
@@ -204,6 +208,7 @@ public partial class MainWindow : Window
             RefreshDevices(true);
             _diagnosticsWindow?.SetDevices(_connected.Values.ToArray());
             _passportWindow?.SetDevices(_connected.Values.ToArray());
+            _hardwareStationWindow?.SetDevices(_connected.Values.ToArray());
             SetStatus($"{_connected.Count} foot control{(_connected.Count == 1 ? string.Empty : "s")} connected");
         });
     }
@@ -231,6 +236,7 @@ public partial class MainWindow : Window
             if (_inputSuspended) return;
             _diagnosticsWindow?.Record(e, System.Diagnostics.Stopwatch.GetTimestamp());
             _passportWindow?.Record(e, System.Diagnostics.Stopwatch.GetTimestamp());
+            _hardwareStationWindow?.RecordInput(e, System.Diagnostics.Stopwatch.GetTimestamp());
             var triggerId = $"{e.Device.DeviceKey}:{e.SwitchIndex}";
             var key = (e.Device.DeviceKey, e.SwitchIndex);
             ApplicationProfileRule? applicationProfile = null;
@@ -1376,7 +1382,7 @@ public partial class MainWindow : Window
         var targetBankIndex = Math.Clamp(bankIndex ?? device.ActiveBankIndex, 0, AppProfile.MaxBanks - 1);
         var banks = GetEffectiveBanks(device);
         var binding = banks[targetBankIndex].Bindings[switchIndex];
-        var editor = new MacroEditorWindow(binding)
+        var editor = new MacroEditorWindow(binding, _profile.Osc)
         {
             Owner = this, Title = $"Bank {targetBankIndex + 1} · {device.DisplayName} · Pedal {switchIndex + 1}"
         };
@@ -1405,6 +1411,7 @@ public partial class MainWindow : Window
             SyncRawInputDevices();
             _macroPlayer.ConfigureSafety(_profile.Safety);
             _macroPlayer.ConfigureMidi(_profile.Midi);
+            _macroPlayer.ConfigureOsc(_profile.Osc);
             _gestureEngine.ConfigureMaximumRepeatDuration(TimeSpan.FromSeconds(_profile.Safety.MaximumRepeatSeconds));
             _patternEngine.Configure(_profile.PedalPatterns);
             _lastOptimizationKey = string.Empty;
@@ -1441,7 +1448,7 @@ public partial class MainWindow : Window
     private void Settings_Click(object sender, RoutedEventArgs e)
     {
         var startup = new StartupRegistrationService();
-        var settings = new SettingsWindow(_profile.BankHotkey, _profile.StartMinimized,
+        var settings = new SettingsWindow(_profile.BankHotkey, _profile.Name, _profile.StartMinimized,
             startup.IsEnabled(), _profile.CheckForUpdatesOnStartup, _gamepad,
             _profile.Safety, _profile.Overlay, _profile.Variables) { Owner = this };
         if (settings.ShowDialog() == true)
@@ -1492,14 +1499,16 @@ public partial class MainWindow : Window
         menu.Items.Add(CreateToolsItem("Foot combinations & sequences", OpenFootPatterns));
         menu.Items.Add(CreateToolsItem("Live pedal diagnostics", OpenDiagnostics));
         menu.Items.Add(CreateToolsItem("Hardware Passport", OpenHardwarePassport));
+        menu.Items.Add(CreateToolsItem("Hardware-in-the-loop test station", OpenHardwareTestStation));
         menu.Items.Add(CreateToolsItem("MIDI output setup", OpenMidiSetup));
+        menu.Items.Add(CreateToolsItem("OSC endpoints & test", OpenOscSetup));
         menu.Items.Add(CreateToolsItem("Sub-compact pedal view", () => SetSubCompactMode(true)));
         var rehearsal = new MenuItem { Header = "Rehearsal mode — preview without output", IsCheckable = true, IsChecked = _rehearsalMode };
         rehearsal.Click += (_, _) => SetRehearsalMode(rehearsal.IsChecked);
         menu.Items.Add(rehearsal);
         menu.Items.Add(new Separator());
         menu.Items.Add(CreateToolsItem("Profile backups & portable mode", OpenStorageTools));
-        menu.Items.Add(CreateToolsItem("Install pedal support pack", InstallPedalSupportPack));
+        menu.Items.Add(CreateToolsItem("Browse & update pedal support packs", InstallPedalSupportPack));
         menu.Items.Add(CreateToolsItem("Export learned pedal definition", ExportLearnedPedal));
         menu.Items.Add(CreateToolsItem("Import learned pedal definition", ImportLearnedPedal));
         menu.Items.Add(CreateToolsItem("Learn keyboard-style pedal", LearnRawInputPedal));
@@ -1523,16 +1532,19 @@ public partial class MainWindow : Window
             new("AUTOMATION", "Foot combinations & sequences", "Trigger an action from multiple pedals together or from an ordered series of presses.", OpenFootPatterns),
             new("AUTOMATION", "Rehearsal mode", "Exercise banks, gestures, scenes, and patterns while suppressing every output action.", () => SetRehearsalMode(!_rehearsalMode)),
             new("DEVICES", "Hardware Passport", "Certify switch repetition, simultaneous presses, releases, reconnect behavior, and routing latency.", OpenHardwarePassport),
+            new("DEVICES", "Hardware-in-the-loop station", "Run real hot-plug, soak, simultaneous-input, stuck-release, and physical press-to-output regression tests.", OpenHardwareTestStation),
             new("DEVICES", "Learn an unknown USB HID pedal", "Capture stable reports for one to 32 digital switches with repeated-sample and simultaneous validation.", OpenHidLearner),
             new("DEVICES", "Learn a keyboard-style pedal", "Bind keys only from a selected physical Raw Input device without remapping the normal keyboard.", LearnRawInputPedal),
             new("PORTABILITY", "Export learned pedal", "Save one learned raw-HID device as a portable, shareable .tippy-device.json definition.", ExportLearnedPedal),
             new("PORTABILITY", "Import learned pedal", "Install a portable learned-device definition and immediately rescan connected hardware.", ImportLearnedPedal),
             new("PORTABILITY", "Profile backups & portable mode", "Restore automatic backups or carry Tippy and its data on removable storage.", OpenStorageTools),
-            new("PORTABILITY", "Install pedal support pack", "Install checksum-verified, data-only device identities and artwork.", InstallPedalSupportPack),
+            new("PORTABILITY", "Pedal support-pack catalog", "Browse authenticated publishers, install checksum-verified packs, and deliver trusted updates.", InstallPedalSupportPack),
             new("OUTPUT", "MIDI output", "Choose and test the Windows MIDI destination used by note, CC, and program-change macros.", OpenMidiSetup),
+            new("OUTPUT", "OSC endpoints", "Save reusable OSC destinations and send a live standards-compliant test packet.", OpenOscSetup),
             new("SAFETY", "Live diagnostics", "Inspect raw reports, simultaneous states, reconnects, and press-to-routing latency.", OpenDiagnostics),
             new("SAFETY", "Overlay, variables & limits", "Configure the click-through overlay, reusable macro variables, emergency stop, and safety limits.",
                 () => Settings_Click(this, new RoutedEventArgs())),
+            new("AUTOMATION", "Named variable manager", "Create, preview, and reuse friendly named values without editing raw name=value lines.", OpenVariableManager),
             new("SOFTWARE", "Check for updates", "Ask GitHub for the latest public Tippy release; no account, telemetry, or background service is used.",
                 () => _ = CheckForUpdatesAsync(true))
         };
@@ -1572,6 +1584,7 @@ public partial class MainWindow : Window
         }
         _diagnosticsWindow = new PedalDiagnosticsWindow { Owner = this };
         _diagnosticsWindow.SetDevices(_connected.Values.ToArray());
+        _diagnosticsWindow.CertificationRequested += (_, _) => OpenHardwarePassport();
         _diagnosticsWindow.Closed += (_, _) => _diagnosticsWindow = null;
         _diagnosticsWindow.Show();
     }
@@ -1587,6 +1600,19 @@ public partial class MainWindow : Window
         _passportWindow.SetDevices(_connected.Values.ToArray());
         _passportWindow.Closed += (_, _) => _passportWindow = null;
         _passportWindow.Show();
+    }
+
+    private void OpenHardwareTestStation()
+    {
+        if (_hardwareStationWindow is { IsLoaded: true })
+        {
+            _hardwareStationWindow.Activate();
+            return;
+        }
+        _hardwareStationWindow = new HardwareTestStationWindow { Owner = this };
+        _hardwareStationWindow.SetDevices(_connected.Values.ToArray());
+        _hardwareStationWindow.Closed += (_, _) => _hardwareStationWindow = null;
+        _hardwareStationWindow.Show();
     }
 
     private async void ExportLearnedPedal()
@@ -1657,6 +1683,28 @@ public partial class MainWindow : Window
             : $"MIDI macros will use {_profile.Midi.PreferredOutputName}");
     }
 
+    private void OpenOscSetup()
+    {
+        var setup = new OscSetupWindow(_profile.Osc) { Owner = this };
+        if (setup.ShowDialog() != true) return;
+        _profile.Osc = setup.Result;
+        _profile.Osc.Normalize();
+        _macroPlayer.ConfigureOsc(_profile.Osc);
+        ScheduleSave();
+        var endpoint = _profile.Osc.Resolve(null);
+        SetStatus(endpoint is null ? "OSC endpoints saved" : $"OSC default · {endpoint.Name} · {endpoint.Host}:{endpoint.Port}");
+    }
+
+    private void OpenVariableManager()
+    {
+        var manager = new VariableManagerWindow(_profile.Variables, _profile.Name) { Owner = this };
+        if (manager.ShowDialog() != true) return;
+        _profile.Variables = manager.Result.Select(variable =>
+            new TippyVariable { Name = variable.Name, Value = variable.Value }).ToList();
+        ScheduleSave();
+        SetStatus($"Saved {_profile.Variables.Count} named variable{(_profile.Variables.Count == 1 ? string.Empty : "s")}");
+    }
+
     private void ShowOverlay(string title, string context)
     {
         if (!_profile.Overlay.Enabled) return;
@@ -1687,6 +1735,7 @@ public partial class MainWindow : Window
         _bankResolver.Clear();
         _macroPlayer.ConfigureSafety(_profile.Safety);
         _macroPlayer.ConfigureMidi(_profile.Midi);
+        _macroPlayer.ConfigureOsc(_profile.Osc);
         _gestureEngine.ConfigureMaximumRepeatDuration(TimeSpan.FromSeconds(_profile.Safety.MaximumRepeatSeconds));
         _patternEngine.Configure(_profile.PedalPatterns);
         ThemeService.Apply(_profile.Theme);
@@ -1701,25 +1750,14 @@ public partial class MainWindow : Window
         SetStatus("Restored profile backup");
     }
 
-    private async void InstallPedalSupportPack()
+    private void InstallPedalSupportPack()
     {
-        var dialog = new OpenFileDialog
-        {
-            Title = "Install checksum-verified Tippy pedal support pack",
-            Filter = "Tippy pedal packs (*.tippy-pedal-pack.zip)|*.tippy-pedal-pack.zip|ZIP archives (*.zip)|*.zip"
-        };
-        if (dialog.ShowDialog(this) != true) return;
-        try
-        {
-            var result = await new DeviceSupportPackService().InstallAsync(dialog.FileName);
-            _pedalRegistry.Reload();
-            RefreshDevices();
-            SetStatus($"Installed pedal pack {result.PackId} {result.Version} · {result.FileCount} verified files");
-        }
-        catch (Exception exception)
-        {
-            MessageBox.Show(this, exception.Message, "Pedal support pack", MessageBoxButton.OK, MessageBoxImage.Error);
-        }
+        var catalog = new SupportPackCatalogWindow { Owner = this };
+        catalog.ShowDialog();
+        if (!catalog.LibraryChanged) return;
+        _pedalRegistry.Reload();
+        RefreshDevices();
+        SetStatus("Pedal support library updated and reloaded");
     }
 
     private void LearnRawInputPedal()

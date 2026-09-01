@@ -32,7 +32,11 @@ pc:channel:program
 
 `noteon` is accepted as an explicit alias for `note`, and `off` is accepted as an alias for `noteoff`. Channels are 1–16; all other values are 0–127. Tippy validates every message instead of silently clipping an invalid value. For a sustained note, assign the note-on message to **Press Action** and the matching note-off message to **Release Action**. Choose and test the profile's destination under **Tools → MIDI output setup**; Tippy remembers the device by name, reconnects lazily, and reports a missing output without redirecting to the wrong device.
 
-OSC steps accept a `/path`, comma-separated integer/decimal/text arguments, and a `host:port` destination. Both systems open resources lazily and perform no background scanning.
+OSC steps accept a `/path` plus comma-separated integer, decimal, and text arguments. **Tools → OSC endpoints & test** manages reusable named destinations and sends a live packet; linked macro steps keep the preset ID so one endpoint change updates every action. Both MIDI and OSC open resources lazily and perform no background scanning.
+
+Virtual Xbox output includes digital buttons, both thumb-stick axes, and both analog triggers. One-shot actions pulse and return an axis to neutral; held actions keep their percentage until physical release. Axis ownership is layered, so releasing one pedal restores another pedal's still-held value instead of snapping the controller to neutral.
+
+Named variables are edited through a table with add, duplicate, remove, built-in-token previews, and live expansion. Profiles remain ordinary portable JSON.
 
 ## Rehearsal and emergency stop
 

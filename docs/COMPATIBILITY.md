@@ -48,15 +48,17 @@ Timed recordings are closed with matching key-up steps if recording stops while 
 ## Completed compatibility infrastructure
 
 - Individual learned-device export/import, descriptor fingerprints, repeated sampling, volatile-byte rejection, and simultaneous-input validation.
-- Hardware Passport sessions and privacy-safe certification exports covering repeated switches, simultaneous input, reconnect, release state, and latency.
+- Automated Hardware Passport sessions and privacy-safe certification exports covering repeated switches, simultaneous input, reconnect, unplug-while-held cleanup, release state, and latency percentiles.
+- A hardware-in-the-loop station for physical hot-plug, soak, cleanup, and HID-receipt-to-output-dispatch regression reports.
+- Authenticated RSA-SHA256 pedal-pack publishers, a browsable HTTPS catalog, archive pinning, installed-version tracking, and user-driven updates.
 - A signable release pipeline and installer; repository certificate secrets activate Authenticode signing without code changes.
 
 ## Next compatibility milestones
 
 1. Grow the reviewed community registry from exported Hardware Passports and verified device definitions.
 2. Add purpose-built adapters for popular Olympus, Philips, vPedal, and other USB transcription controls as hardware reports are verified.
-3. Move the remaining action routing fully off the UI dispatcher and add physical hardware-in-the-loop press-to-output measurements to CI lab runs.
-4. Add authenticated publisher review and discovery on top of the existing checksum-verified data-only pedal pack installer.
+3. Feed reviewed Passport and HIL exports into a community compatibility matrix and optional dedicated CI hardware lab.
+4. Add external electrical or optical loopback fixtures where end-to-end mechanical latency certification is required.
 
 ## Performance targets
 
