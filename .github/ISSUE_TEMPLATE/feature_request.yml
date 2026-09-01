@@ -1,0 +1,22 @@
+name: Feature request
+description: Suggest a pedal, action, workflow, or interface improvement
+title: "[Feature]: "
+labels: [enhancement]
+body:
+  - type: textarea
+    id: need
+    attributes:
+      label: What would you like Tippy to do?
+      description: Describe the outcome and why it would be useful.
+    validations:
+      required: true
+  - type: input
+    id: pedal
+    attributes:
+      label: Related pedal or application
+      placeholder: Optional
+  - type: textarea
+    id: approach
+    attributes:
+      label: Suggested behavior
+      description: Explain the interaction you imagine, if you have one.

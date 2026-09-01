@@ -1,0 +1,22 @@
+<Window x:Class="Tippy.App.BankTargetWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Choose pedals" Width="520" SizeToContent="Height"
+        MaxHeight="650" WindowStartupLocation="CenterOwner" ShowInTaskbar="False"
+        Icon="/Tippy;component/Assets/Icons/tippy.ico"
+        Background="{DynamicResource BackgroundBrush}" Foreground="{DynamicResource TextBrush}">
+    <Grid Margin="22">
+        <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+        <StackPanel>
+            <TextBlock Text="Load bank into pedals" FontSize="22" FontWeight="SemiBold"/>
+            <TextBlock x:Name="BankInfoText" Style="{StaticResource SmallMutedText}" Margin="0,5,0,0" TextWrapping="Wrap"/>
+            <TextBlock Text="The bank will replace the currently active bank on every checked pedal."
+                       Style="{StaticResource SmallMutedText}" Margin="0,4,0,0" TextWrapping="Wrap"/>
+        </StackPanel>
+        <StackPanel x:Name="TargetsPanel" Grid.Row="1" Margin="0,18,0,0"/>
+        <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,20,0,0">
+            <Button Content="Cancel" IsCancel="True" Margin="0,0,8,0"/>
+            <Button Content="Load selected" Click="Load_Click" Background="{DynamicResource AccentBrush}" Foreground="#101820"/>
+        </StackPanel>
+    </Grid>
+</Window>

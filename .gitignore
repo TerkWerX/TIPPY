@@ -1,0 +1,23 @@
+# .NET / Visual Studio
+bin/
+obj/
+.vs/
+.idea/
+.vscode/
+*.user
+*.suo
+TestResults/
+
+# Local build and packaging output
+dist/
+artifacts/
+*.zip
+*.nupkg
+
+# Local tooling and diagnostics
+.codex-temp/
+*.log
+
+# OS metadata
+Thumbs.db
+.DS_Store

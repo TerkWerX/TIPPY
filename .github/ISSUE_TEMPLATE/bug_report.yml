@@ -1,0 +1,44 @@
+name: Bug report
+description: Report a repeatable problem with Tippy
+title: "[Bug]: "
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: Thanks for helping improve Tippy. Please remove serial numbers and machine-specific HID paths from screenshots or logs.
+  - type: input
+    id: version
+    attributes:
+      label: Tippy version
+      placeholder: 0.3.0
+    validations:
+      required: true
+  - type: input
+    id: pedal
+    attributes:
+      label: Pedal model
+      placeholder: Infinity IN-USB-2 Version 14
+    validations:
+      required: true
+  - type: textarea
+    id: problem
+    attributes:
+      label: What happened?
+      description: Include what you expected and what occurred instead.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Connect...
+        2. Select...
+        3. Press...
+    validations:
+      required: true
+  - type: textarea
+    id: details
+    attributes:
+      label: Additional details
+      description: Windows build, theme, layout, screenshots, or sanitized diagnostic output.

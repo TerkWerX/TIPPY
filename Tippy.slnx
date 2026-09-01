@@ -1,0 +1,9 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Tippy.App/Tippy.App.csproj" />
+    <Project Path="src/Tippy.Core/Tippy.Core.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Tippy.Core.Tests/Tippy.Core.Tests.csproj" />
+  </Folder>
+</Solution>
