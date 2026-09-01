@@ -39,7 +39,7 @@ Tabbed mode shows one full-size pedal at a time and deliberately contracts the s
 
 ![Tippy Applications shortcut browser](docs/images/tippy-applications.png)
 
-The searchable catalog currently includes 472 commands across 27 Windows applications, including Microsoft Office, Adobe creative tools, Blender, GIMP, Maya, Ableton Live, Reason, REAPER, Audacity, VS Code, VLC, and more.
+The searchable catalog currently includes 557 commands across 32 Windows applications, including Microsoft Office, Adobe creative tools, Blender, GIMP, Maya, Ableton Live, Reason, REAPER, Audacity, OBS Studio, Streamlabs Desktop, vMix, XSplit Broadcaster, Wirecast, VS Code, VLC, and more. Live-production entries use clearly labeled paired bindings: assign the same shortcut inside the streaming application, then let Tippy send it from a pedal.
 
 </details>
 

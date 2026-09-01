@@ -11,6 +11,7 @@ Notable changes to Tippy are documented here.
 - Persistent selected pedal tab and tile-column preference in profile schema version 4.
 - Drag reordering through pedal cards and compact tab headers.
 - **To tray** command with notification-area restore and exit controls; pedal input remains active while hidden.
+- Added OBS Studio, Streamlabs Desktop, vMix, XSplit Broadcaster, and Wirecast paired bindings for scene/camera switching and live-production controls.
 
 ## [0.3.0] - 2026-09-01
 
