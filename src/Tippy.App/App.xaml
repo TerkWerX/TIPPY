@@ -58,6 +58,9 @@
             <Setter Property="Padding" Value="10,7"/>
             <Setter Property="BorderThickness" Value="1"/>
         </Style>
+        <Style TargetType="CheckBox">
+            <Setter Property="Foreground" Value="{DynamicResource TextBrush}"/>
+        </Style>
         <Style TargetType="ComboBox">
             <Setter Property="Foreground" Value="#111820"/>
             <Setter Property="Background" Value="#F4F7FB"/>
