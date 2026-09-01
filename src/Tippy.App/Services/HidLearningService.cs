@@ -2,6 +2,8 @@ using System.Security.Cryptography;
 using System.IO;
 using HidSharp;
 using Tippy.App.Models;
+using Tippy.Core.Input;
+using Tippy.Core.Models;
 
 namespace Tippy.App.Services;
 
@@ -52,6 +54,17 @@ public sealed class HidLearningService
         IProgress<HidCaptureProgress>? progress,
         CancellationToken cancellationToken)
     {
+        var samples = await CapturePressReleaseSamplesAsync(candidate, 1, progress, cancellationToken).ConfigureAwait(false);
+        return (samples.Pressed[0], samples.Released[0]);
+    }
+
+    public async Task<HidCaptureSamples> CapturePressReleaseSamplesAsync(
+        HidCandidateInfo candidate,
+        int sampleCount,
+        IProgress<HidCaptureProgress>? progress,
+        CancellationToken cancellationToken)
+    {
+        sampleCount = Math.Clamp(sampleCount, 1, 5);
         var device = DeviceList.Local.GetHidDevices(candidate.VendorId, candidate.ProductId)
             .FirstOrDefault(item => item.DevicePath.Equals(candidate.DevicePath, StringComparison.OrdinalIgnoreCase))
             ?? throw new IOException("The selected HID device is no longer connected.");
@@ -62,14 +75,62 @@ public sealed class HidLearningService
 
         using (stream)
         {
-            progress?.Report(new HidCaptureProgress("Keep the switch released while Tippy arms the input."));
-            var baseline = await TryReadBaselineAsync(stream, candidate.ReportLength, cancellationToken).ConfigureAwait(false);
-            progress?.Report(new HidCaptureProgress("Armed — press and hold the switch now."));
-            var pressed = await ReadNextAsync(stream, candidate.ReportLength, baseline, cancellationToken).ConfigureAwait(false);
-            progress?.Report(new HidCaptureProgress(
-                $"Pressed {Convert.ToHexString(pressed)} — release the same switch.", pressed, true));
-            var released = await ReadNextAsync(stream, candidate.ReportLength, pressed, cancellationToken).ConfigureAwait(false);
-            return (pressed, released);
+            List<byte[]> pressedSamples = [];
+            List<byte[]> releasedSamples = [];
+            byte[]? previous = null;
+            for (var sample = 0; sample < sampleCount; sample++)
+            {
+                progress?.Report(new HidCaptureProgress(
+                    $"Sample {sample + 1} of {sampleCount}: keep the switch released while Tippy arms."));
+                var baseline = await TryReadBaselineAsync(stream, candidate.ReportLength, cancellationToken).ConfigureAwait(false)
+                               ?? previous;
+                progress?.Report(new HidCaptureProgress(
+                    $"Sample {sample + 1} of {sampleCount}: armed — press and hold the switch now."));
+                var pressed = await ReadNextAsync(stream, candidate.ReportLength, baseline, cancellationToken).ConfigureAwait(false);
+                progress?.Report(new HidCaptureProgress(
+                    $"Sample {sample + 1} of {sampleCount}: press captured — release the same switch.", pressed, true));
+                var released = await ReadNextAsync(stream, candidate.ReportLength, pressed, cancellationToken).ConfigureAwait(false);
+                pressedSamples.Add(pressed);
+                releasedSamples.Add(released);
+                previous = released;
+                if (sample + 1 < sampleCount)
+                    await Task.Delay(180, cancellationToken).ConfigureAwait(false);
+            }
+            return new HidCaptureSamples(pressedSamples, releasedSamples);
+        }
+    }
+
+    public async Task ValidateSimultaneousAsync(
+        HidCandidateInfo candidate,
+        LearnedPedalDefinition definition,
+        IProgress<HidCaptureProgress>? progress,
+        CancellationToken cancellationToken)
+    {
+        var device = DeviceList.Local.GetHidDevices(candidate.VendorId, candidate.ProductId)
+            .FirstOrDefault(item => item.DevicePath.Equals(candidate.DevicePath, StringComparison.OrdinalIgnoreCase))
+            ?? throw new IOException("The selected HID device is no longer connected.");
+        if (!device.TryOpen(out var stream))
+            throw new IOException("Windows could not open the selected HID device. Close its vendor software and try again.");
+        using (stream)
+        {
+            var decoder = new LearnedReportDecoder(definition);
+            var state = new bool[definition.Switches.Count];
+            progress?.Report(new HidCaptureProgress("Keep every switch released while Tippy arms simultaneous validation."));
+            var previous = await TryReadBaselineAsync(stream, candidate.ReportLength, cancellationToken).ConfigureAwait(false);
+            progress?.Report(new HidCaptureProgress("Armed — press and hold any two switches together."));
+            while (state.Count(value => value) < 2)
+            {
+                var report = await ReadNextAsync(stream, candidate.ReportLength, previous, cancellationToken).ConfigureAwait(false);
+                previous = report;
+                decoder.Decode(report, state);
+            }
+            progress?.Report(new HidCaptureProgress("Two switches recognized — release both switches now.", previous, true));
+            while (state.Any(value => value))
+            {
+                var report = await ReadNextAsync(stream, candidate.ReportLength, previous, cancellationToken).ConfigureAwait(false);
+                previous = report;
+                decoder.Decode(report, state);
+            }
         }
     }
 

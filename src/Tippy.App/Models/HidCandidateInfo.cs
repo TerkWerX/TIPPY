@@ -15,3 +15,5 @@ public sealed record HidCandidateInfo(
 }
 
 public sealed record HidCaptureProgress(string Message, byte[]? Report = null, bool PressCaptured = false);
+
+public sealed record HidCaptureSamples(IReadOnlyList<byte[]> Pressed, IReadOnlyList<byte[]> Released);

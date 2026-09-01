@@ -1,0 +1,68 @@
+<Window x:Class="Tippy.App.HardwarePassportWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Tippy Hardware Passport" Width="900" Height="700" MinWidth="760" MinHeight="600"
+        WindowStartupLocation="CenterOwner" Background="{DynamicResource BackgroundBrush}"
+        Foreground="{DynamicResource TextBrush}" Icon="/Tippy;component/Assets/Icons/tippy.ico">
+    <Grid Margin="22">
+        <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+        <StackPanel>
+            <TextBlock Text="Tippy Hardware Passport" FontSize="25" FontWeight="SemiBold"/>
+            <TextBlock Text="Prove a pedal's switches, simultaneous input, release safety, reconnect behavior, and routing latency without collecting macro contents."
+                       Style="{StaticResource SmallMutedText}" TextWrapping="Wrap" Margin="0,4,0,0"/>
+        </StackPanel>
+
+        <Grid Grid.Row="1" Margin="0,18,0,12">
+            <Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+            <ComboBox x:Name="DeviceBox" DisplayMemberPath="DisplayName" MinWidth="360"/>
+            <Button Grid.Column="1" x:Name="StartButton" Content="Start certification" Click="Start_Click" Margin="10,0,8,0" Background="{DynamicResource AccentSoftBrush}"/>
+            <Button Grid.Column="2" Content="Reset" Click="Reset_Click"/>
+        </Grid>
+
+        <Border Grid.Row="2" Background="{DynamicResource SurfaceBrush}" BorderBrush="{DynamicResource BorderBrush}"
+                BorderThickness="1" CornerRadius="10" Padding="14" Margin="0,0,0,12">
+            <Grid>
+                <Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition/><ColumnDefinition/></Grid.ColumnDefinitions>
+                <StackPanel><TextBlock Text="STATUS" Style="{StaticResource SmallMutedText}" FontWeight="Bold"/><TextBlock x:Name="StatusText" Text="Choose a pedal and start" FontSize="17" Margin="0,4,8,0" TextWrapping="Wrap"/></StackPanel>
+                <StackPanel Grid.Column="1"><TextBlock Text="ROUTING LATENCY" Style="{StaticResource SmallMutedText}" FontWeight="Bold"/><TextBlock x:Name="LatencyText" Text="—" FontSize="17" Margin="0,4,8,0"/></StackPanel>
+                <StackPanel Grid.Column="2"><TextBlock Text="SIMULTANEOUS" Style="{StaticResource SmallMutedText}" FontWeight="Bold"/><TextBlock x:Name="SimultaneousText" Text="Not tested" FontSize="17" Margin="0,4,0,0"/></StackPanel>
+            </Grid>
+        </Border>
+
+        <Grid Grid.Row="3">
+            <Grid.ColumnDefinitions><ColumnDefinition Width="330"/><ColumnDefinition Width="14"/><ColumnDefinition/></Grid.ColumnDefinitions>
+            <Border Background="{DynamicResource SurfaceBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="10" Padding="15">
+                <StackPanel>
+                    <TextBlock Text="CERTIFICATION CHECKLIST" Style="{StaticResource SmallMutedText}" FontWeight="Bold"/>
+                    <TextBlock x:Name="EverySwitchText" Text="○ Press and release every switch twice" Margin="0,13,0,0" TextWrapping="Wrap"/>
+                    <TextBlock x:Name="TogetherText" Text="○ Press at least two switches together" Margin="0,11,0,0" TextWrapping="Wrap"/>
+                    <TextBlock x:Name="ReconnectText" Text="○ Unplug and reconnect the pedal" Margin="0,11,0,0" TextWrapping="Wrap"/>
+                    <TextBlock x:Name="ReleaseText" Text="○ Finish with every switch released" Margin="0,11,0,0" TextWrapping="Wrap"/>
+                    <Separator Margin="0,16,0,13"/>
+                    <TextBlock Text="Instructions" FontWeight="SemiBold"/>
+                    <TextBlock Text="1. Press and release each switch at least twice.&#x0a;2. Hold two or more switches at the same time.&#x0a;3. Release everything, unplug the pedal, and reconnect it."
+                               Style="{StaticResource SmallMutedText}" TextWrapping="Wrap" Margin="0,6,0,0"/>
+                </StackPanel>
+            </Border>
+            <DataGrid x:Name="EventsGrid" Grid.Column="2" IsReadOnly="True" AutoGenerateColumns="False" CanUserAddRows="False"
+                      HeadersVisibility="Column" GridLinesVisibility="Horizontal">
+                <DataGrid.Columns>
+                    <DataGridTextColumn Header="Time" Binding="{Binding Time}" Width="95"/>
+                    <DataGridTextColumn Header="Switch" Binding="{Binding Switch}" Width="75"/>
+                    <DataGridTextColumn Header="State" Binding="{Binding State}" Width="95"/>
+                    <DataGridTextColumn Header="Latency" Binding="{Binding Latency}" Width="90"/>
+                    <DataGridTextColumn Header="Raw report sample" Binding="{Binding Raw}" Width="*"/>
+                </DataGrid.Columns>
+            </DataGrid>
+        </Grid>
+
+        <Grid Grid.Row="4" Margin="0,15,0,0">
+            <TextBlock x:Name="PrivacyText" Text="Reports contain device descriptors and small HID samples only—never typed text or macro assignments."
+                       Style="{StaticResource SmallMutedText}" VerticalAlignment="Center"/>
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                <Button x:Name="ExportButton" Content="Export passport" Click="Export_Click" IsEnabled="False" Margin="0,0,8,0"/>
+                <Button Content="Close" IsCancel="True"/>
+            </StackPanel>
+        </Grid>
+    </Grid>
+</Window>

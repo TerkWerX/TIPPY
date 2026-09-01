@@ -12,12 +12,13 @@ public partial class LearnPedalWindow : Window
 {
     private const int MaximumLearnedSwitches = 32;
     private readonly HidLearningService _learning = new();
-    private byte[]?[] _pressed = [];
-    private byte[]?[] _released = [];
+    private IReadOnlyList<byte[]>?[] _pressed = [];
+    private IReadOnlyList<byte[]>?[] _released = [];
     private Button[] _captureButtons = [];
     private TextBlock[] _stepStatuses = [];
     private CancellationTokenSource? _captureCancellation;
     private bool _busy;
+    private bool _simultaneousValidated;
 
     public LearnPedalWindow()
     {
@@ -82,8 +83,8 @@ public partial class LearnPedalWindow : Window
     private void ConfigureSwitchCount(int switchCount)
     {
         switchCount = Math.Clamp(switchCount, 1, MaximumLearnedSwitches);
-        _pressed = new byte[switchCount][];
-        _released = new byte[switchCount][];
+        _pressed = new IReadOnlyList<byte[]>[switchCount];
+        _released = new IReadOnlyList<byte[]>[switchCount];
         _captureButtons = new Button[switchCount];
         _stepStatuses = new TextBlock[switchCount];
         SwitchStepsPanel.Children.Clear();
@@ -92,6 +93,8 @@ public partial class LearnPedalWindow : Window
             BuildCaptureStep(index);
         }
         FinishButton.IsEnabled = false;
+        ValidateButton.IsEnabled = false;
+        _simultaneousValidated = switchCount == 1;
         ResultHint.Text = $"Capture all {switchCount} switch{(switchCount == 1 ? string.Empty : "es")} to finish.";
     }
 
@@ -131,13 +134,18 @@ public partial class LearnPedalWindow : Window
         var candidate = SelectedCandidate;
         if (candidate is null || _busy) return;
         _busy = true;
+        _pressed[index] = null;
+        _released[index] = null;
+        _simultaneousValidated = _pressed.Length == 1;
+        FinishButton.IsEnabled = false;
+        ValidateButton.IsEnabled = false;
         SetControlsEnabled(false);
         _captureButtons[index].IsEnabled = true;
         _captureButtons[index].Content = "Listening…";
         _stepStatuses[index].Text = "Keep this switch released while Tippy arms";
         _stepStatuses[index].Foreground = (Brush)FindResource("PressedBrush");
         LearningHint.Text = "Wait for the armed message before pressing the switch.";
-        _captureCancellation = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+        _captureCancellation = new CancellationTokenSource(TimeSpan.FromSeconds(60));
         var progress = new Progress<HidCaptureProgress>(capture =>
         {
             _stepStatuses[index].Text = capture.Message;
@@ -148,10 +156,11 @@ public partial class LearnPedalWindow : Window
 
         try
         {
-            var pair = await _learning.CapturePressReleaseAsync(candidate, progress, _captureCancellation.Token);
-            _pressed[index] = pair.Pressed;
-            _released[index] = pair.Released;
-            _stepStatuses[index].Text = $"✓ {Convert.ToHexString(pair.Pressed)} → {Convert.ToHexString(pair.Released)}";
+            var samples = await _learning.CapturePressReleaseSamplesAsync(candidate, 3, progress, _captureCancellation.Token);
+            _pressed[index] = samples.Pressed;
+            _released[index] = samples.Released;
+            _simultaneousValidated = _pressed.Length == 1;
+            _stepStatuses[index].Text = $"✓ 3 stable samples · {Convert.ToHexString(samples.Pressed[0])} → {Convert.ToHexString(samples.Released[0])}";
             _stepStatuses[index].Foreground = (Brush)FindResource("SuccessBrush");
             LearningHint.Text = "Captured. Release all switches before the next capture.";
         }
@@ -172,9 +181,13 @@ public partial class LearnPedalWindow : Window
             _captureButtons[index].Content = _pressed[index] is null ? "Capture" : "Recapture";
             _busy = false;
             SetControlsEnabled(true);
-            FinishButton.IsEnabled = _pressed.All(report => report is not null) && _released.All(report => report is not null);
+            var complete = _pressed.All(report => report is not null) && _released.All(report => report is not null);
+            ValidateButton.IsEnabled = complete && _pressed.Length > 1;
+            FinishButton.IsEnabled = complete && _simultaneousValidated;
             ResultHint.Text = FinishButton.IsEnabled
-                ? "All switches captured. Save when ready."
+                ? "Stable samples and simultaneous input validated. Save when ready."
+                : complete
+                    ? "Now validate any two switches pressed together."
                 : $"Capture all {_pressed.Length} switch{(_pressed.Length == 1 ? string.Empty : "es")} to finish.";
         }
     }
@@ -200,6 +213,8 @@ public partial class LearnPedalWindow : Window
             _captureButtons[index].Content = "Capture";
         }
         FinishButton.IsEnabled = false;
+        ValidateButton.IsEnabled = false;
+        _simultaneousValidated = _pressed.Length == 1;
         ResultHint.Text = $"Capture all {_pressed.Length} switch{(_pressed.Length == 1 ? string.Empty : "es")} to finish.";
     }
 
@@ -209,13 +224,7 @@ public partial class LearnPedalWindow : Window
         if (candidate is null) return;
         try
         {
-            var definition = new LearnedDefinitionBuilder().Build(
-                MappingNameBox.Text,
-                candidate.ProductName,
-                candidate.VendorId,
-                candidate.ProductId,
-                _pressed.Select(report => report!).ToArray(),
-                _released.Select(report => report!).ToArray());
+            var definition = BuildDefinition(candidate);
             definition.ReportDescriptorHash = candidate.ReportDescriptorHash;
             Result = definition;
             var eventStyle = definition.Switches.Any(rule => rule.Selectors.Count > 0);
@@ -227,5 +236,67 @@ public partial class LearnPedalWindow : Window
             MessageBox.Show(this, $"Tippy could not derive a stable mapping from those samples. Recapture each switch carefully.\n\n{exception.Message}",
                 "Could not learn pedal", MessageBoxButton.OK, MessageBoxImage.Warning);
         }
+    }
+
+    private async void ValidateSimultaneous_Click(object sender, RoutedEventArgs e)
+    {
+        var candidate = SelectedCandidate;
+        if (candidate is null || _busy) return;
+        LearnedPedalDefinition definition;
+        try { definition = BuildDefinition(candidate); }
+        catch (Exception exception)
+        {
+            MessageBox.Show(this, exception.Message, "Could not validate mapping", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+        _busy = true;
+        FinishButton.IsEnabled = false;
+        SetControlsEnabled(false);
+        ValidateButton.IsEnabled = true;
+        ValidateButton.Content = "Listening…";
+        LearningHint.Text = "Press and hold any two switches together, then release both together.";
+        _captureCancellation = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+        var progress = new Progress<HidCaptureProgress>(capture => LearningHint.Text =
+            capture.PressCaptured ? "Two-switch report captured. Release both switches together." : capture.Message);
+        try
+        {
+            await _learning.ValidateSimultaneousAsync(candidate, definition, progress, _captureCancellation.Token);
+            _simultaneousValidated = true;
+            FinishButton.IsEnabled = true;
+            ResultHint.Text = "Stable samples and simultaneous input validated. Save when ready.";
+            LearningHint.Text = "✓ Simultaneous switches were independently recognized and released.";
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            _simultaneousValidated = false;
+            FinishButton.IsEnabled = false;
+            LearningHint.Text = $"Validation failed: {exception.Message}";
+        }
+        catch (OperationCanceledException)
+        {
+            LearningHint.Text = "Validation timed out. Release every switch and try again.";
+        }
+        finally
+        {
+            _captureCancellation?.Dispose();
+            _captureCancellation = null;
+            _busy = false;
+            SetControlsEnabled(true);
+            ValidateButton.IsEnabled = true;
+            ValidateButton.Content = "Validate two together";
+        }
+    }
+
+    private LearnedPedalDefinition BuildDefinition(HidCandidateInfo candidate)
+    {
+        var definition = new LearnedDefinitionBuilder().Build(
+            MappingNameBox.Text,
+            candidate.ProductName,
+            candidate.VendorId,
+            candidate.ProductId,
+            _pressed.Select(report => report!).ToArray(),
+            _released.Select(report => report!).ToArray());
+        definition.ReportDescriptorHash = candidate.ReportDescriptorHash;
+        return definition;
     }
 }

@@ -21,7 +21,7 @@ These devices share the same three-switch HID protocol and can be connected conc
 
 ### User-learned raw-HID support
 
-The learning wizard can capture **1–32 digital switches** from an otherwise unknown USB HID input device. Snapshot-style button masks support simultaneous presses; indexed event-style reports are also supported. A matching VID/PID and report descriptor identify the learned device while allowing harmless product-name changes.
+The learning wizard can capture **1–32 digital switches** from an otherwise unknown USB HID input device. It takes three press/release samples per switch, rejects bytes that vary between samples, and requires a real simultaneous-switch validation for multi-switch hardware. Snapshot-style button masks support simultaneous presses; indexed event-style reports are also supported. A matching VID/PID and report descriptor identify the learned device while allowing harmless product-name changes. Individual definitions can be exported and imported as data-only `.tippy-device.json` files.
 
 Learning is intended for digital, momentary buttons. Analog axes, pressure, velocity, vendor initialization commands, encrypted protocols, and devices opened exclusively by another program require a purpose-built adapter.
 
@@ -45,13 +45,18 @@ Timed recordings are closed with matching key-up steps if recording stops while 
 - Tippy currently uses Windows `SendInput`; it does not turn the physical pedal into a firmware-level USB keyboard. Elevated windows, exclusive-input games, and anti-cheat systems can reject injected input.
 - A pedal unplugged while held is treated as released so it cannot strand a key or virtual gamepad button.
 
+## Completed compatibility infrastructure
+
+- Individual learned-device export/import, descriptor fingerprints, repeated sampling, volatile-byte rejection, and simultaneous-input validation.
+- Hardware Passport sessions and privacy-safe certification exports covering repeated switches, simultaneous input, reconnect, release state, and latency.
+- A signable release pipeline and installer; repository certificate secrets activate Authenticode signing without code changes.
+
 ## Next compatibility milestones
 
-1. Export/import individual learned-device definitions and extend the reviewed community registry with descriptor hashes, report samples, switch counts, and hardware verification results.
-2. Improve the armed idle-baseline learning flow with multiple press/release samples, volatile-byte masking, and a simultaneous-button validation step.
-3. Add purpose-built adapters for popular Olympus, Philips, vPedal, and other USB transcription controls as hardware reports are verified.
-4. Move the remaining action routing fully off the UI dispatcher and add hardware-in-the-loop press-to-output measurements to CI lab runs.
-5. Add reviewed, signed publishing infrastructure on top of the existing checksum-verified data-only pedal pack installer.
+1. Grow the reviewed community registry from exported Hardware Passports and verified device definitions.
+2. Add purpose-built adapters for popular Olympus, Philips, vPedal, and other USB transcription controls as hardware reports are verified.
+3. Move the remaining action routing fully off the UI dispatcher and add physical hardware-in-the-loop press-to-output measurements to CI lab runs.
+4. Add authenticated publisher review and discovery on top of the existing checksum-verified data-only pedal pack installer.
 
 ## Performance targets
 

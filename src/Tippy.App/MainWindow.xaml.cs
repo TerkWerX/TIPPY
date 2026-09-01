@@ -65,16 +65,21 @@ public partial class MainWindow : Window
     private string? _activeApplicationProfileId;
     private bool _artworkPickerOpen;
     private PedalDiagnosticsWindow? _diagnosticsWindow;
+    private HardwarePassportWindow? _passportWindow;
+    private AdvancedFeaturesWindow? _advancedFeaturesWindow;
     private StatusOverlayWindow? _overlayWindow;
     private bool _rehearsalMode;
     private string? _startupProfileError;
     private WindowState _windowStateBeforeTray = WindowState.Normal;
     private bool _restoreMaximizedOnLoad;
     private int _deviceLayoutGeneration;
+    private readonly bool _forceStartMinimized;
+    private bool _checkingForUpdates;
 
-    public MainWindow()
+    public MainWindow(bool forceStartMinimized = false)
     {
         InitializeComponent();
+        _forceStartMinimized = forceStartMinimized;
         try
         {
             _profile = _profileStore.LoadDefaultAsync().GetAwaiter().GetResult();
@@ -139,7 +144,8 @@ public partial class MainWindow : Window
         SyncRawInputDevices();
         _hid.Start();
         SetStatus("Listening for USB foot controls");
-        if (_profile.StartMinimized)
+        if (_profile.CheckForUpdatesOnStartup) _ = CheckForUpdatesAsync(false);
+        if (_profile.StartMinimized || _forceStartMinimized)
         {
             _ = Dispatcher.BeginInvoke(new Action(HideToTray));
         }
@@ -170,6 +176,14 @@ public partial class MainWindow : Window
                     deviceProfile.Normalize();
                     ScheduleSave();
                 }
+                var addedToScene = false;
+                foreach (var applicationProfile in _profile.ApplicationProfiles)
+                {
+                    if (applicationProfile.GetDeviceScene(deviceProfile.DeviceKey) is not null) continue;
+                    applicationProfile.EnsureDeviceScene(deviceProfile);
+                    addedToScene = true;
+                }
+                if (addedToScene) ScheduleSave();
                 var needsAmbiguousChoice = string.IsNullOrWhiteSpace(deviceProfile.ArtworkKey) &&
                                            _pedalRegistry.IsAmbiguous(e.Device);
                 if (string.IsNullOrWhiteSpace(deviceProfile.ArtworkKey))
@@ -189,6 +203,7 @@ public partial class MainWindow : Window
             }
             RefreshDevices(true);
             _diagnosticsWindow?.SetDevices(_connected.Values.ToArray());
+            _passportWindow?.SetDevices(_connected.Values.ToArray());
             SetStatus($"{_connected.Count} foot control{(_connected.Count == 1 ? string.Empty : "s")} connected");
         });
     }
@@ -215,6 +230,7 @@ public partial class MainWindow : Window
         {
             if (_inputSuspended) return;
             _diagnosticsWindow?.Record(e, System.Diagnostics.Stopwatch.GetTimestamp());
+            _passportWindow?.Record(e, System.Diagnostics.Stopwatch.GetTimestamp());
             var triggerId = $"{e.Device.DeviceKey}:{e.SwitchIndex}";
             var key = (e.Device.DeviceKey, e.SwitchIndex);
             ApplicationProfileRule? applicationProfile = null;
@@ -261,7 +277,8 @@ public partial class MainWindow : Window
                 return;
             }
             var bankIndex = _bankResolver.Resolve(device, applicationProfile);
-            var binding = device.Banks[bankIndex].Bindings[e.SwitchIndex];
+            var banks = GetEffectiveBanks(device, applicationProfile);
+            var binding = banks[bankIndex].Bindings[e.SwitchIndex];
             _pedalActivity.Publish(device.DeviceKey, device.DisplayName, e.SwitchIndex);
             foreach (var pattern in _patternEngine.Press(triggerId, System.Diagnostics.Stopwatch.GetTimestamp()))
             {
@@ -278,7 +295,7 @@ public partial class MainWindow : Window
                         SetStatus($"Rehearsal · would switch {device.DisplayName} to the next bank");
                         ShowOverlay("Next bank", $"Would switch · {device.DisplayName}");
                     }
-                    else SwitchPedalBank(device, (device.ActiveBankIndex + 1) % AppProfile.MaxBanks);
+                    else SwitchPedalBank(device, (bankIndex + 1) % AppProfile.MaxBanks);
                     break;
                 case PedalBindingType.ShiftLayer:
                     if (_rehearsalMode)
@@ -375,7 +392,7 @@ public partial class MainWindow : Window
         var foreground = _foregroundApplications.GetCurrent();
         if (foreground is null) return null;
         return _profile.ApplicationProfiles.FirstOrDefault(profile =>
-            profile.Matches(foreground.ProcessName, foreground.ExecutablePath));
+            profile.Matches(foreground.ProcessName, foreground.ExecutablePath, foreground.WindowTitle));
     }
 
     private void SetActiveApplicationProfile(ApplicationProfileRule? profile)
@@ -386,7 +403,7 @@ public partial class MainWindow : Window
         RefreshDevices();
         UpdateHeader();
         ShowOverlay(profile?.Name ?? "Default banks",
-            profile is null ? "No foreground application profile" : "Foreground application profile active");
+            profile is null ? "No foreground application scene" : "Foreground application scene active");
     }
 
     private ApplicationProfileRule? GetActiveApplicationProfile() =>
@@ -397,6 +414,17 @@ public partial class MainWindow : Window
 
     private int GetEffectiveBankIndex(PedalDeviceProfile device) =>
         _bankResolver.Resolve(device, GetActiveApplicationProfile());
+
+    private static IReadOnlyList<PedalBank> GetEffectiveBanks(
+        PedalDeviceProfile device,
+        ApplicationProfileRule? applicationProfile)
+    {
+        var scene = applicationProfile?.GetDeviceScene(device.DeviceKey);
+        return scene is { Banks.Count: AppProfile.MaxBanks } ? scene.Banks : device.Banks;
+    }
+
+    private IReadOnlyList<PedalBank> GetEffectiveBanks(PedalDeviceProfile device) =>
+        GetEffectiveBanks(device, GetActiveApplicationProfile());
 
     private void ReleaseActionsForDevice(string deviceKey)
     {
@@ -435,7 +463,13 @@ public partial class MainWindow : Window
     {
         bankIndex = Math.Clamp(bankIndex, 0, AppProfile.MaxBanks - 1);
         _profile.ActiveBankIndex = bankIndex;
-        foreach (var device in _profile.Devices) device.ActiveBankIndex = bankIndex;
+        var applicationProfile = GetActiveApplicationProfile();
+        foreach (var device in _profile.Devices)
+        {
+            var scene = applicationProfile?.GetDeviceScene(device.DeviceKey);
+            if (scene is null) device.ActiveBankIndex = bankIndex;
+            else scene.ActiveBankIndex = bankIndex;
+        }
         UpdateBankButtons();
         RefreshDevices();
         ScheduleSave();
@@ -445,19 +479,22 @@ public partial class MainWindow : Window
 
     private void SwitchPedalBank(PedalDeviceProfile device, int bankIndex)
     {
-        device.ActiveBankIndex = Math.Clamp(bankIndex, 0, AppProfile.MaxBanks - 1);
+        bankIndex = Math.Clamp(bankIndex, 0, AppProfile.MaxBanks - 1);
+        var scene = GetActiveApplicationProfile()?.GetDeviceScene(device.DeviceKey);
+        if (scene is null) device.ActiveBankIndex = bankIndex;
+        else scene.ActiveBankIndex = bankIndex;
         UpdateBankButtons();
         RefreshDevices();
         ScheduleSave();
-        SetStatus($"{device.DisplayName} · Bank {device.ActiveBankIndex + 1} active");
-        ShowOverlay($"Bank {device.ActiveBankIndex + 1}", device.DisplayName);
+        SetStatus($"{device.DisplayName} · Bank {bankIndex + 1} active");
+        ShowOverlay($"Bank {bankIndex + 1}", device.DisplayName);
     }
 
     private void UpdateBankButtons()
     {
         for (var index = 0; index < _bankButtons.Count; index++)
         {
-            var active = _profile.Devices.Count > 0 && _profile.Devices.All(device => device.ActiveBankIndex == index);
+            var active = _profile.Devices.Count > 0 && _profile.Devices.All(device => GetEffectiveBankIndex(device) == index);
             _bankButtons[index].Background = (Brush)FindResource(active ? "AccentBrush" : "SurfaceBrush");
             _bankButtons[index].Foreground = active ? Brushes.Black : (Brush)FindResource("TextBrush");
             _bankButtons[index].BorderBrush = (Brush)FindResource(active ? "AccentBrush" : "BorderBrush");
@@ -719,6 +756,7 @@ public partial class MainWindow : Window
     {
         var effectiveBankIndex = GetEffectiveBankIndex(device);
         var applicationProfile = GetActiveApplicationProfile();
+        var banks = GetEffectiveBanks(device, applicationProfile);
         var isShifted = _bankResolver.IsShifted(device.DeviceKey);
         var bar = new Border
         {
@@ -735,7 +773,7 @@ public partial class MainWindow : Window
         var bankPanel = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
         bankPanel.Children.Add(new TextBlock
         {
-            Text = isShifted ? "SHIFT BANK" : applicationProfile is null ? "BANK" : "APP BANK",
+            Text = isShifted ? "SHIFT BANK" : applicationProfile is null ? "BANK" : "APP SCENE",
             ToolTip = isShifted
                 ? "A momentary layer is active"
                 : applicationProfile is null ? null : $"{applicationProfile.Name} foreground profile",
@@ -749,7 +787,7 @@ public partial class MainWindow : Window
             var button = new Button
             {
                 Content = (index + 1).ToString(), Padding = denseRows ? new Thickness(8, 2, 8, 2) : new Thickness(10, 4, 10, 4),
-                Margin = new Thickness(0, 0, 5, 0), ToolTip = device.Banks[index].Name,
+                Margin = new Thickness(0, 0, 5, 0), ToolTip = banks[index].Name,
                 Background = (Brush)FindResource(active ? "AccentBrush" : "SurfaceBrush"),
                 Foreground = active ? Brushes.Black : (Brush)FindResource("TextBrush"),
                 BorderBrush = (Brush)FindResource(active ? "AccentBrush" : "BorderBrush")
@@ -779,7 +817,7 @@ public partial class MainWindow : Window
 
     private async Task SavePedalBankAsync(PedalDeviceProfile device)
     {
-        var bank = device.Banks[device.ActiveBankIndex];
+        var bank = GetEffectiveBanks(device)[GetEffectiveBankIndex(device)];
         var dialog = new SaveFileDialog
         {
             Filter = "Tippy bank (*.tippy-bank.json)|*.tippy-bank.json",
@@ -823,7 +861,7 @@ public partial class MainWindow : Window
 
     private void CopyPedalBank(PedalDeviceProfile source)
     {
-        var bank = source.Banks[source.ActiveBankIndex];
+        var bank = GetEffectiveBanks(source)[GetEffectiveBankIndex(source)];
         ChooseTargetsAndApply(new SavedPedalBank
         {
             Name = bank.Name,
@@ -854,7 +892,10 @@ public partial class MainWindow : Window
         {
             var clone = saved.Bank.Clone();
             clone.EnsureSwitchCount(target.SwitchCount);
-            target.Banks[target.ActiveBankIndex] = clone;
+            var banks = GetEffectiveBanks(target);
+            var targetIndex = GetEffectiveBankIndex(target);
+            if (banks is List<PedalBank> mutable) mutable[targetIndex] = clone;
+            else target.Banks[targetIndex] = clone;
         }
         RefreshDevices();
         ScheduleSave();
@@ -1283,7 +1324,7 @@ public partial class MainWindow : Window
     private Border CreateSwitchOverlay(PedalDeviceProfile device, int switchIndex, bool connected, bool dense = false)
     {
         var bankIndex = GetEffectiveBankIndex(device);
-        var binding = device.Banks[bankIndex].Bindings[switchIndex];
+        var binding = GetEffectiveBanks(device)[bankIndex].Bindings[switchIndex];
         var tile = new Border
         {
             Background = Brushes.Transparent, BorderBrush = Brushes.Transparent,
@@ -1333,14 +1374,16 @@ public partial class MainWindow : Window
     private void EditBinding(PedalDeviceProfile device, int switchIndex, int? bankIndex = null)
     {
         var targetBankIndex = Math.Clamp(bankIndex ?? device.ActiveBankIndex, 0, AppProfile.MaxBanks - 1);
-        var binding = device.Banks[targetBankIndex].Bindings[switchIndex];
+        var banks = GetEffectiveBanks(device);
+        var binding = banks[targetBankIndex].Bindings[switchIndex];
         var editor = new MacroEditorWindow(binding)
         {
             Owner = this, Title = $"Bank {targetBankIndex + 1} · {device.DisplayName} · Pedal {switchIndex + 1}"
         };
         if (editor.ShowDialog() == true)
         {
-            device.Banks[targetBankIndex].Bindings[switchIndex] = editor.Result;
+            if (banks is List<PedalBank> mutable) mutable[targetBankIndex].Bindings[switchIndex] = editor.Result;
+            else device.Banks[targetBankIndex].Bindings[switchIndex] = editor.Result;
             RefreshDevices();
             ScheduleSave();
         }
@@ -1397,12 +1440,25 @@ public partial class MainWindow : Window
 
     private void Settings_Click(object sender, RoutedEventArgs e)
     {
-        var settings = new SettingsWindow(_profile.BankHotkey, _profile.StartMinimized, _gamepad,
+        var startup = new StartupRegistrationService();
+        var settings = new SettingsWindow(_profile.BankHotkey, _profile.StartMinimized,
+            startup.IsEnabled(), _profile.CheckForUpdatesOnStartup, _gamepad,
             _profile.Safety, _profile.Overlay, _profile.Variables) { Owner = this };
         if (settings.ShowDialog() == true)
         {
             _profile.BankHotkey = settings.BankHotkey;
             _profile.StartMinimized = settings.StartMinimized;
+            try
+            {
+                startup.SetEnabled(settings.StartWithWindows);
+                _profile.StartWithWindows = settings.StartWithWindows;
+            }
+            catch (Exception exception)
+            {
+                MessageBox.Show(this, exception.Message, "Windows startup", MessageBoxButton.OK, MessageBoxImage.Warning);
+                _profile.StartWithWindows = startup.IsEnabled();
+            }
+            _profile.CheckForUpdatesOnStartup = settings.CheckForUpdates;
             _profile.Safety = settings.Safety;
             _profile.Overlay = settings.Overlay;
             _profile.Variables = settings.Variables.ToList();
@@ -1425,14 +1481,17 @@ public partial class MainWindow : Window
         RefreshDevices();
         UpdateHeader();
         ScheduleSave();
-        SetStatus($"Saved {_profile.ApplicationProfiles.Count} foreground application profile{(_profile.ApplicationProfiles.Count == 1 ? string.Empty : "s")}");
+        SetStatus($"Saved {_profile.ApplicationProfiles.Count} application scene{(_profile.ApplicationProfiles.Count == 1 ? string.Empty : "s")}");
     }
 
     private void Tools_Click(object sender, RoutedEventArgs e)
     {
         var menu = new ContextMenu();
+        menu.Items.Add(CreateToolsItem("Advanced Features center", OpenAdvancedFeatures));
+        menu.Items.Add(new Separator());
         menu.Items.Add(CreateToolsItem("Foot combinations & sequences", OpenFootPatterns));
         menu.Items.Add(CreateToolsItem("Live pedal diagnostics", OpenDiagnostics));
+        menu.Items.Add(CreateToolsItem("Hardware Passport", OpenHardwarePassport));
         menu.Items.Add(CreateToolsItem("MIDI output setup", OpenMidiSetup));
         menu.Items.Add(CreateToolsItem("Sub-compact pedal view", () => SetSubCompactMode(true)));
         var rehearsal = new MenuItem { Header = "Rehearsal mode — preview without output", IsCheckable = true, IsChecked = _rehearsalMode };
@@ -1441,9 +1500,45 @@ public partial class MainWindow : Window
         menu.Items.Add(new Separator());
         menu.Items.Add(CreateToolsItem("Profile backups & portable mode", OpenStorageTools));
         menu.Items.Add(CreateToolsItem("Install pedal support pack", InstallPedalSupportPack));
+        menu.Items.Add(CreateToolsItem("Export learned pedal definition", ExportLearnedPedal));
+        menu.Items.Add(CreateToolsItem("Import learned pedal definition", ImportLearnedPedal));
         menu.Items.Add(CreateToolsItem("Learn keyboard-style pedal", LearnRawInputPedal));
         menu.PlacementTarget = sender as UIElement;
         menu.IsOpen = true;
+    }
+
+    private void AdvancedFeatures_Click(object sender, RoutedEventArgs e) => OpenAdvancedFeatures();
+
+    private void OpenAdvancedFeatures()
+    {
+        if (_advancedFeaturesWindow is { IsLoaded: true })
+        {
+            _advancedFeaturesWindow.Activate();
+            return;
+        }
+        var features = new AdvancedFeatureItem[]
+        {
+            new("AUTOMATION", "Application scenes", "Give each application or matching window title its own complete three-bank setup for every pedal.",
+                () => ApplicationProfiles_Click(this, new RoutedEventArgs())),
+            new("AUTOMATION", "Foot combinations & sequences", "Trigger an action from multiple pedals together or from an ordered series of presses.", OpenFootPatterns),
+            new("AUTOMATION", "Rehearsal mode", "Exercise banks, gestures, scenes, and patterns while suppressing every output action.", () => SetRehearsalMode(!_rehearsalMode)),
+            new("DEVICES", "Hardware Passport", "Certify switch repetition, simultaneous presses, releases, reconnect behavior, and routing latency.", OpenHardwarePassport),
+            new("DEVICES", "Learn an unknown USB HID pedal", "Capture stable reports for one to 32 digital switches with repeated-sample and simultaneous validation.", OpenHidLearner),
+            new("DEVICES", "Learn a keyboard-style pedal", "Bind keys only from a selected physical Raw Input device without remapping the normal keyboard.", LearnRawInputPedal),
+            new("PORTABILITY", "Export learned pedal", "Save one learned raw-HID device as a portable, shareable .tippy-device.json definition.", ExportLearnedPedal),
+            new("PORTABILITY", "Import learned pedal", "Install a portable learned-device definition and immediately rescan connected hardware.", ImportLearnedPedal),
+            new("PORTABILITY", "Profile backups & portable mode", "Restore automatic backups or carry Tippy and its data on removable storage.", OpenStorageTools),
+            new("PORTABILITY", "Install pedal support pack", "Install checksum-verified, data-only device identities and artwork.", InstallPedalSupportPack),
+            new("OUTPUT", "MIDI output", "Choose and test the Windows MIDI destination used by note, CC, and program-change macros.", OpenMidiSetup),
+            new("SAFETY", "Live diagnostics", "Inspect raw reports, simultaneous states, reconnects, and press-to-routing latency.", OpenDiagnostics),
+            new("SAFETY", "Overlay, variables & limits", "Configure the click-through overlay, reusable macro variables, emergency stop, and safety limits.",
+                () => Settings_Click(this, new RoutedEventArgs())),
+            new("SOFTWARE", "Check for updates", "Ask GitHub for the latest public Tippy release; no account, telemetry, or background service is used.",
+                () => _ = CheckForUpdatesAsync(true))
+        };
+        _advancedFeaturesWindow = new AdvancedFeaturesWindow(features) { Owner = this };
+        _advancedFeaturesWindow.Closed += (_, _) => _advancedFeaturesWindow = null;
+        _advancedFeaturesWindow.Show();
     }
 
     private static MenuItem CreateToolsItem(string header, Action action)
@@ -1479,6 +1574,74 @@ public partial class MainWindow : Window
         _diagnosticsWindow.SetDevices(_connected.Values.ToArray());
         _diagnosticsWindow.Closed += (_, _) => _diagnosticsWindow = null;
         _diagnosticsWindow.Show();
+    }
+
+    private void OpenHardwarePassport()
+    {
+        if (_passportWindow is { IsLoaded: true })
+        {
+            _passportWindow.Activate();
+            return;
+        }
+        _passportWindow = new HardwarePassportWindow { Owner = this };
+        _passportWindow.SetDevices(_connected.Values.ToArray());
+        _passportWindow.Closed += (_, _) => _passportWindow = null;
+        _passportWindow.Show();
+    }
+
+    private async void ExportLearnedPedal()
+    {
+        if (_profile.LearnedPedals.Count == 0)
+        {
+            MessageBox.Show(this, "No raw-HID pedal definitions have been learned yet.", "Export learned pedal");
+            return;
+        }
+        var labels = _profile.LearnedPedals.Select(definition =>
+            $"{definition.Name} · VID_{definition.VendorId:X4} PID_{definition.ProductId:X4} · {definition.Switches.Count} switches").ToArray();
+        var selected = PromptDialog.Choose(this, "Export learned pedal", "Choose one portable device definition", labels);
+        var index = Array.IndexOf(labels, selected);
+        if (index < 0) return;
+        var definition = _profile.LearnedPedals[index];
+        var dialog = new SaveFileDialog
+        {
+            Filter = "Tippy learned pedal (*.tippy-device.json)|*.tippy-device.json",
+            FileName = $"{SafeFileName(definition.Name)}.tippy-device.json",
+            AddExtension = true,
+            DefaultExt = ".tippy-device.json"
+        };
+        if (dialog.ShowDialog(this) != true) return;
+        try
+        {
+            await LearnedPedalDefinitionStore.SaveAsync(dialog.FileName, definition);
+            SetStatus($"Exported learned pedal · {definition.Name}");
+        }
+        catch (Exception exception)
+        {
+            MessageBox.Show(this, exception.Message, "Could not export learned pedal", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+    }
+
+    private async void ImportLearnedPedal()
+    {
+        var dialog = new OpenFileDialog
+        {
+            Filter = "Tippy learned pedal (*.tippy-device.json)|*.tippy-device.json|JSON files (*.json)|*.json"
+        };
+        if (dialog.ShowDialog(this) != true) return;
+        try
+        {
+            var definition = await LearnedPedalDefinitionStore.LoadAsync(dialog.FileName);
+            _profile.LearnedPedals.RemoveAll(existing => existing.MatchesHardwareIdentity(definition));
+            _profile.LearnedPedals.Add(definition);
+            _hid.ConfigureLearnedDevices(_profile.LearnedPedals);
+            ScheduleSave();
+            await _hid.ScanAsync();
+            SetStatus($"Imported learned pedal · {definition.Name}");
+        }
+        catch (Exception exception)
+        {
+            MessageBox.Show(this, exception.Message, "Could not import learned pedal", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
     }
 
     private void OpenMidiSetup()
@@ -2244,7 +2407,9 @@ public partial class MainWindow : Window
         SetStatus($"Scan complete · {_connected.Count} connected");
     }
 
-    private void LearnPedal_Click(object sender, RoutedEventArgs e)
+    private void LearnPedal_Click(object sender, RoutedEventArgs e) => OpenHidLearner();
+
+    private void OpenHidLearner()
     {
         var wizard = new LearnPedalWindow { Owner = this };
         if (wizard.ShowDialog() != true || wizard.Result is null) return;
@@ -2257,13 +2422,54 @@ public partial class MainWindow : Window
         SetStatus($"Learned {wizard.Result.Name}; scanning for it now");
     }
 
+    private async Task CheckForUpdatesAsync(bool interactive)
+    {
+        if (_checkingForUpdates) return;
+        _checkingForUpdates = true;
+        if (interactive) SetStatus("Checking GitHub for Tippy updates…");
+        try
+        {
+            var result = await new UpdateService().CheckAsync();
+            if (!result.IsUpdateAvailable)
+            {
+                SetStatus($"Tippy {result.CurrentVersion.Major}.{result.CurrentVersion.Minor}.{Math.Max(0, result.CurrentVersion.Build)} is up to date");
+                if (interactive)
+                    MessageBox.Show(this, "You already have the latest public version of Tippy.", "Tippy updates",
+                        MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
+            SetStatus($"Tippy {result.LatestTag} is available");
+            if (MessageBox.Show(this,
+                    $"{result.ReleaseTitle} is available.\n\nOpen the download page now?",
+                    "Tippy update available", MessageBoxButton.YesNo, MessageBoxImage.Information) == MessageBoxResult.Yes)
+            {
+                System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+                {
+                    FileName = result.ReleaseUrl,
+                    UseShellExecute = true
+                });
+            }
+        }
+        catch (Exception exception)
+        {
+            if (interactive)
+                MessageBox.Show(this, $"Tippy could not check GitHub for updates.\n\n{exception.Message}",
+                    "Tippy updates", MessageBoxButton.OK, MessageBoxImage.Warning);
+            else SetStatus("Update check unavailable; Tippy will continue normally");
+        }
+        finally
+        {
+            _checkingForUpdates = false;
+        }
+    }
+
     private void RegisterBankHotkey()
     {
         if (!_loaded || new System.Windows.Interop.WindowInteropHelper(this).Handle == IntPtr.Zero) return;
         if (!_hotkey.Register(this, _profile.BankHotkey,
                 () => Dispatcher.Invoke(() =>
                 {
-                    var current = _profile.Devices.Count == 0 ? _profile.ActiveBankIndex : _profile.Devices.Max(device => device.ActiveBankIndex);
+                    var current = _profile.Devices.Count == 0 ? _profile.ActiveBankIndex : _profile.Devices.Max(GetEffectiveBankIndex);
                     SwitchAllBanks((current + 1) % AppProfile.MaxBanks);
                 }), out var error))
         {
@@ -2286,7 +2492,7 @@ public partial class MainWindow : Window
         var applicationProfile = GetActiveApplicationProfile();
         BankHintText.Text = applicationProfile is null
             ? $"{_profile.BankHotkey.Replace("+", " + ")} switches bank"
-            : $"{applicationProfile.Name} profile · {_profile.BankHotkey.Replace("+", " + ")} switches bank";
+            : $"{applicationProfile.Name} scene · {_profile.BankHotkey.Replace("+", " + ")} switches bank";
     }
 
     private void SetStatus(string text, bool isError = false)

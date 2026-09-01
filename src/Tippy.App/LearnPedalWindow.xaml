@@ -67,13 +67,15 @@
             <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
                 <StackPanel x:Name="SwitchStepsPanel"/>
             </ScrollViewer>
-            <TextBlock Grid.Row="2" x:Name="LearningHint" Text="Release every switch before starting a capture. Tippy stores only the small HID reports shown here."
+            <TextBlock Grid.Row="2" x:Name="LearningHint" Text="Tippy captures each switch three times so changing counter bytes and other volatile data can be ignored."
                        TextWrapping="Wrap" Style="{StaticResource SmallMutedText}" Margin="0,10,0,0"/>
         </Grid>
 
         <Grid Grid.Row="4" Margin="0,20,0,0">
             <TextBlock x:Name="ResultHint" Text="Capture every switch to finish." Style="{StaticResource SmallMutedText}" VerticalAlignment="Center"/>
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                <Button x:Name="ValidateButton" Content="Validate two together" Click="ValidateSimultaneous_Click" IsEnabled="False"
+                        Margin="0,0,8,0" ToolTip="Press and release any two switches together to prove simultaneous input is decoded correctly"/>
                 <Button Content="Cancel" IsCancel="True" Margin="0,0,8,0"/>
                 <Button x:Name="FinishButton" Content="Save learned pedal" Click="Finish_Click" IsEnabled="False"
                         Background="{DynamicResource AccentBrush}" Foreground="#101820"/>

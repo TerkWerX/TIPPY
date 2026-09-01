@@ -1,0 +1,25 @@
+<Window x:Class="Tippy.App.CrashRecoveryWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Tippy recovery" Width="600" Height="390" ResizeMode="NoResize"
+        WindowStartupLocation="CenterScreen" ShowInTaskbar="True"
+        Background="{DynamicResource BackgroundBrush}" Foreground="{DynamicResource TextBrush}"
+        Icon="/Tippy;component/Assets/Icons/tippy.ico">
+    <Grid Margin="26">
+        <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+        <TextBlock Text="Tippy did not close cleanly" FontSize="24" FontWeight="SemiBold"/>
+        <TextBlock Grid.Row="1" Text="Your current profile has not been discarded. You can start normally or restore the newest automatic backup before Tippy begins listening to any pedals."
+                   TextWrapping="Wrap" Style="{StaticResource SmallMutedText}" Margin="0,8,0,18"/>
+        <Border Grid.Row="2" Background="{DynamicResource SurfaceBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="10" Padding="16">
+            <StackPanel>
+                <TextBlock x:Name="PreviousSessionText" TextWrapping="Wrap"/>
+                <TextBlock x:Name="BackupText" Style="{StaticResource SmallMutedText}" TextWrapping="Wrap" Margin="0,8,0,0"/>
+                <Button Content="Open diagnostic logs folder" Click="OpenLogs_Click" HorizontalAlignment="Left" Margin="0,16,0,0"/>
+            </StackPanel>
+        </Border>
+        <StackPanel Grid.Row="3" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,18,0,0">
+            <Button Content="Restore newest backup" x:Name="RestoreButton" Click="Restore_Click" Margin="0,0,8,0"/>
+            <Button Content="Start normally" Click="Normal_Click" Background="{DynamicResource AccentBrush}" Foreground="#101820"/>
+        </StackPanel>
+    </Grid>
+</Window>

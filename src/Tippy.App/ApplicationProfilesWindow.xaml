@@ -1,14 +1,14 @@
 <Window x:Class="Tippy.App.ApplicationProfilesWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="Tippy application profiles" Width="860" Height="590" MinWidth="760" MinHeight="520"
+        Title="Tippy application scenes" Width="860" Height="590" MinWidth="760" MinHeight="520"
         WindowStartupLocation="CenterOwner" ShowInTaskbar="False"
         Background="{DynamicResource BackgroundBrush}" Foreground="{DynamicResource TextBrush}">
     <Grid Margin="22">
         <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
         <StackPanel>
-            <TextBlock Text="Foreground application profiles" FontSize="24" FontWeight="SemiBold"/>
-            <TextBlock Text="Choose which bank each pedal uses for an application. Tippy checks the foreground program only when a pedal is pressed—there is no background process polling."
+            <TextBlock Text="Application scenes" FontSize="24" FontWeight="SemiBold"/>
+            <TextBlock Text="Each scene owns a complete three-bank set for every pedal. Tippy checks the foreground program only when a pedal is pressed—there is no background process polling."
                        Style="{StaticResource SmallMutedText}" TextWrapping="Wrap" Margin="0,4,0,16"/>
         </StackPanel>
 
@@ -39,12 +39,17 @@
                         <TextBox x:Name="ProfileNameBox" Margin="0,6,0,13"/>
                         <TextBlock Text="EXECUTABLE" Style="{StaticResource SmallMutedText}" FontWeight="Bold"/>
                         <TextBox x:Name="ExecutablePathBox" IsReadOnly="True" Margin="0,6,0,9"/>
+                        <TextBlock Text="WINDOW TITLE CONTAINS (OPTIONAL)" Style="{StaticResource SmallMutedText}" FontWeight="Bold"/>
+                        <TextBox x:Name="WindowTitleBox" Margin="0,6,0,5"/>
+                        <TextBlock Text="Use this to give different documents, projects, OBS collections, or game windows their own scene."
+                                   Style="{StaticResource SmallMutedText}" TextWrapping="Wrap" Margin="0,0,0,11"/>
                         <CheckBox x:Name="EnabledCheckBox" Content="Enable automatic selection for this application" Margin="0,0,0,17"/>
-                        <TextBlock Text="PEDAL BANKS" Style="{StaticResource SmallMutedText}" FontWeight="Bold"/>
-                        <TextBlock Text="Set every pedal independently. Update captures the banks currently selected in the main window."
+                        <TextBlock Text="PEDAL SCENES" Style="{StaticResource SmallMutedText}" FontWeight="Bold"/>
+                        <TextBlock Text="Set the starting bank independently. Each row stores all three banks and every assignment for that pedal."
                                    Style="{StaticResource SmallMutedText}" TextWrapping="Wrap" Margin="0,4,0,8"/>
                         <StackPanel x:Name="DeviceBanksPanel"/>
-                        <Button Content="Use current pedal banks" Click="UseCurrentBanks_Click" HorizontalAlignment="Left" Margin="0,10,0,0"/>
+                        <Button Content="Capture all current pedal bank sets" Click="UseCurrentBanks_Click" HorizontalAlignment="Left" Margin="0,10,0,0"
+                                ToolTip="Replace this application's stored banks with the complete bank sets currently shown in Tippy"/>
                     </StackPanel>
                 </ScrollViewer>
             </Border>

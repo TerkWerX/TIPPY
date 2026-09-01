@@ -30,6 +30,10 @@
                        Style="{StaticResource SmallMutedText}" Margin="0,6,0,0"/>
             <CheckBox x:Name="StartMinimizedCheckBox" Content="Start Tippy in the notification area"
                       Margin="0,14,0,0"/>
+            <CheckBox x:Name="StartWithWindowsCheckBox" Content="Start Tippy automatically when I sign in to Windows"
+                      Margin="0,8,0,0"/>
+            <CheckBox x:Name="CheckUpdatesCheckBox" Content="Check GitHub for Tippy updates when Tippy starts"
+                      Margin="0,8,0,0"/>
         </StackPanel>
 
         <Border Grid.Row="2" Background="{DynamicResource SurfaceBrush}" BorderBrush="{DynamicResource BorderBrush}"

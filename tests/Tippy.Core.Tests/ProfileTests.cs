@@ -64,7 +64,7 @@ public sealed class ProfileTests
 
         var loaded = new ProfileSerializer().Deserialize(json);
 
-        Assert.Equal(11, loaded.SchemaVersion);
+        Assert.Equal(12, loaded.SchemaVersion);
         Assert.All(loaded.Devices, device => Assert.Equal(2, device.ActiveBankIndex));
     }
 
@@ -230,7 +230,7 @@ public sealed class ProfileTests
         var serializer = new ProfileSerializer();
         var loaded = serializer.Deserialize(serializer.Serialize(profile));
 
-        Assert.Equal(11, loaded.SchemaVersion);
+        Assert.Equal(12, loaded.SchemaVersion);
         var learned = Assert.Single(loaded.LearnedPedals);
         Assert.Equal("Custom pedal", learned.Name);
         Assert.Equal(3, learned.Switches.Count);
@@ -322,6 +322,50 @@ public sealed class ProfileTests
     }
 
     [Fact]
+    public void CompleteApplicationScenesOwnTheirBanksAndCanMatchWindowTitles()
+    {
+        var device = PedalDeviceProfile.Create("left", "Left pedal", 1, 2);
+        device.Banks[0].Bindings[0].Macro.Name = "Default action";
+        var rule = new ApplicationProfileRule
+        {
+            Name = "OBS streaming",
+            ProcessName = "obs64",
+            WindowTitleContains = "Live Show"
+        };
+        var scene = rule.EnsureDeviceScene(device);
+        scene.ActiveBankIndex = 2;
+        scene.Banks[2].Bindings[0].Macro.Name = "Switch camera";
+        var profile = new AppProfile { Devices = [device], ApplicationProfiles = [rule] };
+
+        var loaded = new ProfileSerializer().Deserialize(new ProfileSerializer().Serialize(profile));
+        var loadedRule = Assert.Single(loaded.ApplicationProfiles);
+        var loadedScene = Assert.Single(loadedRule.DeviceScenes);
+
+        Assert.False(loadedRule.Matches("obs64", null, "Settings"));
+        Assert.True(loadedRule.Matches("obs64", null, "OBS · Live Show"));
+        Assert.Equal(2, loadedRule.GetBankIndex("left", 0));
+        Assert.Equal("Switch camera", loadedScene.Banks[2].Bindings[0].Macro.Name);
+        Assert.Equal("Default action", loaded.Devices[0].Banks[0].Bindings[0].Macro.Name);
+    }
+
+    [Fact]
+    public void StartupAndUpdatePreferencesRoundTrip()
+    {
+        var profile = new AppProfile
+        {
+            StartMinimized = true,
+            StartWithWindows = true,
+            CheckForUpdatesOnStartup = true
+        };
+
+        var loaded = new ProfileSerializer().Deserialize(new ProfileSerializer().Serialize(profile));
+
+        Assert.True(loaded.StartMinimized);
+        Assert.True(loaded.StartWithWindows);
+        Assert.True(loaded.CheckForUpdatesOnStartup);
+    }
+
+    [Fact]
     public void AdvancedInteractionAndSafetySettingsRoundTrip()
     {
         var profile = new AppProfile
@@ -374,7 +418,7 @@ public sealed class ProfileTests
         var serializer = new ProfileSerializer();
         var loaded = serializer.Deserialize(serializer.Serialize(profile));
 
-        Assert.Equal(11, loaded.SchemaVersion);
+        Assert.Equal(12, loaded.SchemaVersion);
         Assert.Equal("Tippy", Assert.Single(loaded.Variables).Value);
         Assert.Equal(45, loaded.Safety.MaximumMacroSeconds);
         Assert.True(loaded.Overlay.Enabled);

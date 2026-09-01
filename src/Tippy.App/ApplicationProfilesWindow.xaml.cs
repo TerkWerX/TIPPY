@@ -20,6 +20,9 @@ public partial class ApplicationProfilesWindow : Window
         InitializeComponent();
         _working = profiles.Select(profile => profile.Clone()).ToList();
         _devices = devices;
+        foreach (var profile in _working)
+            foreach (var device in _devices)
+                profile.EnsureDeviceScene(device);
         Result = _working.Select(profile => profile.Clone()).ToList();
         Loaded += (_, _) => RefreshList(_working.Count > 0 ? 0 : -1);
     }
@@ -55,6 +58,7 @@ public partial class ApplicationProfilesWindow : Window
         {
             ProfileNameBox.Clear();
             ExecutablePathBox.Clear();
+            WindowTitleBox.Clear();
             EnabledCheckBox.IsChecked = false;
             return;
         }
@@ -62,27 +66,41 @@ public partial class ApplicationProfilesWindow : Window
         var profile = _working[_editingIndex];
         ProfileNameBox.Text = profile.Name;
         ExecutablePathBox.Text = profile.ExecutablePath;
+        WindowTitleBox.Text = profile.WindowTitleContains;
         EnabledCheckBox.IsChecked = profile.Enabled;
         foreach (var device in _devices)
         {
             var row = new Grid { Margin = new Thickness(0, 4, 0, 4) };
             row.ColumnDefinitions.Add(new ColumnDefinition());
             row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-            row.Children.Add(new TextBlock
+            row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            var scene = profile.EnsureDeviceScene(device);
+            var label = new StackPanel { Margin = new Thickness(0, 0, 12, 0) };
+            label.Children.Add(new TextBlock
             {
                 Text = device.DisplayName,
                 VerticalAlignment = VerticalAlignment.Center,
-                TextTrimming = TextTrimming.CharacterEllipsis,
-                Margin = new Thickness(0, 0, 12, 0)
+                TextTrimming = TextTrimming.CharacterEllipsis
             });
+            label.Children.Add(new TextBlock
+            {
+                Text = $"3 banks · {device.SwitchCount} switch{(device.SwitchCount == 1 ? string.Empty : "es")} per bank",
+                Style = (Style)FindResource("SmallMutedText"), Margin = new Thickness(0, 2, 0, 0)
+            });
+            row.Children.Add(label);
             var box = new ComboBox
             {
                 Width = 120,
                 ItemsSource = Enumerable.Range(1, AppProfile.MaxBanks).Select(index => $"Bank {index}").ToArray(),
-                SelectedIndex = profile.GetBankIndex(device.DeviceKey, device.ActiveBankIndex)
+                SelectedIndex = scene.ActiveBankIndex,
+                Margin = new Thickness(0, 0, 8, 0)
             };
             Grid.SetColumn(box, 1);
             row.Children.Add(box);
+            var capture = new Button { Content = "Recapture banks", Padding = new Thickness(9, 5, 9, 5), Tag = device.DeviceKey };
+            capture.Click += CaptureDeviceBanks_Click;
+            Grid.SetColumn(capture, 2);
+            row.Children.Add(capture);
             DeviceBanksPanel.Children.Add(row);
             _bankBoxes[device.DeviceKey] = box;
         }
@@ -96,6 +114,7 @@ public partial class ApplicationProfilesWindow : Window
             ? profile.DisplayProcess
             : ProfileNameBox.Text.Trim();
         profile.Enabled = EnabledCheckBox.IsChecked == true;
+        profile.WindowTitleContains = WindowTitleBox.Text.Trim();
         profile.DeviceBanks = _devices.Select(device => new ApplicationDeviceBank
         {
             DeviceKey = device.DeviceKey,
@@ -103,6 +122,12 @@ public partial class ApplicationProfilesWindow : Window
                 ? box.SelectedIndex
                 : device.ActiveBankIndex
         }).ToList();
+        foreach (var device in _devices)
+        {
+            var scene = profile.EnsureDeviceScene(device);
+            if (_bankBoxes.TryGetValue(device.DeviceKey, out var box) && box.SelectedIndex >= 0)
+                scene.ActiveBankIndex = box.SelectedIndex;
+        }
         profile.Normalize();
     }
 
@@ -124,7 +149,8 @@ public partial class ApplicationProfilesWindow : Window
             {
                 DeviceKey = device.DeviceKey,
                 BankIndex = device.ActiveBankIndex
-            }).ToList()
+            }).ToList(),
+            DeviceScenes = _devices.Select(CreateScene).ToList()
         };
         profile.Normalize();
         _working.Add(profile);
@@ -168,7 +194,8 @@ public partial class ApplicationProfilesWindow : Window
             {
                 DeviceKey = device.DeviceKey,
                 BankIndex = device.ActiveBankIndex
-            }).ToList()
+            }).ToList(),
+            DeviceScenes = _devices.Select(CreateScene).ToList()
         };
         profile.Normalize();
         _working.Add(profile);
@@ -185,14 +212,42 @@ public partial class ApplicationProfilesWindow : Window
 
     private void UseCurrentBanks_Click(object sender, RoutedEventArgs e)
     {
+        if (_editingIndex < 0 || _editingIndex >= _working.Count) return;
+        var profile = _working[_editingIndex];
         foreach (var device in _devices)
         {
+            var scene = profile.EnsureDeviceScene(device);
+            scene.Banks = device.Banks.Select(bank => bank.Clone()).ToList();
+            scene.DisplayName = device.DisplayName;
+            scene.ActiveBankIndex = device.ActiveBankIndex;
+            scene.Normalize();
             if (_bankBoxes.TryGetValue(device.DeviceKey, out var box))
             {
                 box.SelectedIndex = device.ActiveBankIndex;
             }
         }
     }
+
+    private void CaptureDeviceBanks_Click(object sender, RoutedEventArgs e)
+    {
+        if (_editingIndex < 0 || _editingIndex >= _working.Count || sender is not Button { Tag: string deviceKey }) return;
+        var device = _devices.FirstOrDefault(item => item.DeviceKey.Equals(deviceKey, StringComparison.OrdinalIgnoreCase));
+        if (device is null) return;
+        var scene = _working[_editingIndex].EnsureDeviceScene(device);
+        scene.Banks = device.Banks.Select(bank => bank.Clone()).ToList();
+        scene.DisplayName = device.DisplayName;
+        scene.ActiveBankIndex = device.ActiveBankIndex;
+        scene.Normalize();
+        if (_bankBoxes.TryGetValue(device.DeviceKey, out var box)) box.SelectedIndex = device.ActiveBankIndex;
+    }
+
+    private static ApplicationDeviceScene CreateScene(PedalDeviceProfile device) => new()
+    {
+        DeviceKey = device.DeviceKey,
+        DisplayName = device.DisplayName,
+        ActiveBankIndex = device.ActiveBankIndex,
+        Banks = device.Banks.Select(bank => bank.Clone()).ToList()
+    };
 
     private void Save_Click(object sender, RoutedEventArgs e)
     {

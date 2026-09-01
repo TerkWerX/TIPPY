@@ -64,13 +64,15 @@
                            HorizontalAlignment="Right" VerticalAlignment="Center">
                     <Button Content="Open profile" Click="OpenProfile_Click" Margin="0,3,8,3"/>
                     <Button Content="Save as" Click="SaveProfile_Click" Margin="0,3,8,3"/>
-                    <Button Content="App profiles" Click="ApplicationProfiles_Click" Margin="0,3,8,3"/>
+                    <Button Content="App scenes" Click="ApplicationProfiles_Click" Margin="0,3,8,3"/>
                     <Button Content="Settings" Click="Settings_Click" Margin="0,3,8,3"/>
                     <Button Content="To tray" Click="MinimizeToTray_Click" Margin="0,3,8,3" ToolTip="Keep Tippy running in the notification area"/>
                     <Button x:Name="CompactModeButton" Content="Compact view" Click="CompactMode_Click" Margin="0,3,8,3"
                             ToolTip="Hide menus and show one full-size pedal at a time (F11)"/>
                     <Button Content="¼ view" Click="SubCompactMode_Click" Margin="0,3,8,3"
                             ToolTip="Sub-compact: show one quarter-size pedal with no labels or menus"/>
+                    <Button Content="Features" Click="AdvancedFeatures_Click" Margin="0,3,8,3"
+                            ToolTip="Search all of Tippy's advanced capabilities"/>
                     <Button Content="Tools" Click="Tools_Click" Margin="0,3,8,3"/>
                     <Button Content="Help" Click="Help_Click" Margin="0,3,8,3"/>
                     <Button x:Name="ThemeButton" Content="Light mode" Click="Theme_Click" Margin="0,3,0,3"/>

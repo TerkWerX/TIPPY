@@ -13,6 +13,8 @@ public partial class SettingsWindow : Window
     public SettingsWindow(
         string bankHotkey,
         bool startMinimized,
+        bool startWithWindows,
+        bool checkForUpdates,
         VirtualGamepadService gamepad,
         MacroSafetySettings safety,
         OverlaySettings overlay,
@@ -23,6 +25,8 @@ public partial class SettingsWindow : Window
         _gamepad = gamepad;
         HotkeyBox.Text = bankHotkey;
         StartMinimizedCheckBox.IsChecked = startMinimized;
+        StartWithWindowsCheckBox.IsChecked = startWithWindows;
+        CheckUpdatesCheckBox.IsChecked = checkForUpdates;
         GamepadStatusText.Text = gamepad.Status;
         OverlayEnabledCheckBox.IsChecked = overlay.Enabled;
         OverlaySecondsBox.Text = overlay.VisibleSeconds.ToString();
@@ -38,6 +42,8 @@ public partial class SettingsWindow : Window
 
     public string BankHotkey { get; private set; }
     public bool StartMinimized => StartMinimizedCheckBox.IsChecked == true;
+    public bool StartWithWindows => StartWithWindowsCheckBox.IsChecked == true;
+    public bool CheckForUpdates => CheckUpdatesCheckBox.IsChecked == true;
     public MacroSafetySettings Safety { get; private set; } = new();
     public OverlaySettings Overlay { get; private set; } = new();
     public IReadOnlyList<TippyVariable> Variables { get; private set; } = [];
