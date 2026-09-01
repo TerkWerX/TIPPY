@@ -88,6 +88,37 @@ public sealed class WindowPlacementService
         SetWindowPos(handle, IntPtr.Zero, left, top, width, height, SwpNoActivate | SwpNoZOrder);
     }
 
+    public void GrowWithinCurrentMonitor(Window window, double desiredWidth, double desiredHeight, double margin)
+    {
+        var handle = new WindowInteropHelper(window).Handle;
+        if (handle == IntPtr.Zero || !GetWindowRect(handle, out var current)) return;
+        var anchor = new NativeRect
+        {
+            Left = current.Left,
+            Top = current.Top,
+            Right = current.Left + 1,
+            Bottom = current.Top + 1
+        };
+        var work = GetNearestWorkArea(anchor);
+        var dpi = GetWindowDpi(handle);
+        var marginPixels = DipToPixels(margin, dpi);
+        var left = current.Left;
+        var top = current.Top;
+        var availableWidth = Math.Max(1, work.Right - marginPixels - left);
+        var availableHeight = Math.Max(1, work.Bottom - marginPixels - top);
+        var requestedWidth = Math.Max(current.Width, DipToPixels(desiredWidth, dpi));
+        var requestedHeight = Math.Max(current.Height, DipToPixels(desiredHeight, dpi));
+
+        // A normal layout transition may grow into the free space below or to the
+        // right, but it never makes an already adequate window smaller or moves its
+        // top-left corner to another monitor. The caller can scale content when the
+        // remaining work area is not large enough.
+        var width = Math.Max(current.Width, Math.Min(requestedWidth, availableWidth));
+        var height = Math.Max(current.Height, Math.Min(requestedHeight, availableHeight));
+        if (width == current.Width && height == current.Height) return;
+        SetWindowPos(handle, IntPtr.Zero, left, top, width, height, SwpNoActivate | SwpNoZOrder);
+    }
+
     private static NativeRect FitEntirelyWithin(
         NativeRect work,
         NativeRect requested,

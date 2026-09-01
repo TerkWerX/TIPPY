@@ -42,6 +42,7 @@ public partial class MainWindow : Window
     private readonly Dictionary<string, PedalDeviceInfo> _connected = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<(string DeviceKey, int SwitchIndex), Border> _switchTiles = new();
     private readonly Dictionary<string, Border> _pedalTabHeaders = new(StringComparer.OrdinalIgnoreCase);
+    private readonly List<Viewbox> _sizablePedalVisuals = [];
     private readonly HashSet<(string DeviceKey, int SwitchIndex)> _pressedSwitches = [];
     private readonly HashSet<string> _artworkPickerQueued = new(StringComparer.OrdinalIgnoreCase);
     private readonly Queue<(PedalDeviceProfile Profile, PedalDeviceInfo Info)> _pendingArtworkPickers = new();
@@ -69,6 +70,7 @@ public partial class MainWindow : Window
     private string? _startupProfileError;
     private WindowState _windowStateBeforeTray = WindowState.Normal;
     private bool _restoreMaximizedOnLoad;
+    private int _deviceLayoutGeneration;
 
     public MainWindow()
     {
@@ -465,11 +467,13 @@ public partial class MainWindow : Window
     private void RefreshDevices(bool optimizeWindow = false)
     {
         if (!_loaded) return;
+        var layoutGeneration = ++_deviceLayoutGeneration;
         DevicesPanel.Children.Clear();
         DevicesPanel.RowDefinitions.Clear();
         DevicesPanel.ColumnDefinitions.Clear();
         _switchTiles.Clear();
         _pedalTabHeaders.Clear();
+        _sizablePedalVisuals.Clear();
         SubCompactPedalHost.Children.Clear();
         SubCompactDotsPanel.Children.Clear();
         EmptyState.Visibility = _profile.Devices.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
@@ -492,6 +496,7 @@ public partial class MainWindow : Window
         foreach (var pressed in _pressedSwitches) UpdatePressedVisual(pressed, true);
         StatusDot.Fill = (Brush)FindResource(_connected.Count > 0 ? "SuccessBrush" : "MutedTextBrush");
         if (optimizeWindow) OptimizeWindowForPedals();
+        ScheduleNoScrollLayoutFit(layoutGeneration);
     }
 
     private void BuildGridDeviceLayout()
@@ -999,7 +1004,7 @@ public partial class MainWindow : Window
             overlays.Children.Add(tile);
         }
 
-        return new Viewbox
+        var viewbox = new Viewbox
         {
             Stretch = Stretch.Uniform,
             StretchDirection = StretchDirection.DownOnly,
@@ -1009,6 +1014,8 @@ public partial class MainWindow : Window
             HorizontalAlignment = HorizontalAlignment.Stretch,
             Child = canvas
         };
+        _sizablePedalVisuals.Add(viewbox);
+        return viewbox;
     }
 
     private FrameworkElement CreateSubCompactPedalVisual(PedalDeviceProfile device, bool connected)
@@ -1104,7 +1111,7 @@ public partial class MainWindow : Window
         });
         Grid.SetRow(panel, 1);
         shell.Children.Add(panel);
-        return new Viewbox
+        var viewbox = new Viewbox
         {
             Stretch = Stretch.Uniform,
             StretchDirection = StretchDirection.DownOnly,
@@ -1114,6 +1121,8 @@ public partial class MainWindow : Window
             HorizontalAlignment = HorizontalAlignment.Stretch,
             Child = shell
         };
+        _sizablePedalVisuals.Add(viewbox);
+        return viewbox;
     }
 
     private PedalDeviceInfo GetDeviceInfo(PedalDeviceProfile device) =>
@@ -1912,6 +1921,71 @@ public partial class MainWindow : Window
             : Visibility.Collapsed;
     }
 
+    private void ScheduleNoScrollLayoutFit(int layoutGeneration, int pass = 0)
+    {
+        if (_profile.IsSubCompactMode) return;
+        _ = Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Loaded,
+            new Action(() => EnsureNoScrollLayoutFit(layoutGeneration, pass)));
+    }
+
+    private void EnsureNoScrollLayoutFit(int layoutGeneration, int pass)
+    {
+        if (!_loaded || layoutGeneration != _deviceLayoutGeneration || _profile.IsSubCompactMode ||
+            DevicesScrollViewer.Visibility != Visibility.Visible)
+            return;
+
+        DevicesScrollViewer.UpdateLayout();
+        var overflow = LayoutFitCalculator.Overflow(
+            DevicesScrollViewer.ExtentHeight, DevicesScrollViewer.ViewportHeight);
+        if (overflow <= 0.75)
+        {
+            var baseMinimum = _profile.IsCompactMode ? 700d : 650d;
+            var fittedMinimum = LayoutFitCalculator.RequiredMinimumWindowHeight(
+                ActualHeight,
+                DevicesScrollViewer.ExtentHeight,
+                DevicesScrollViewer.ViewportHeight,
+                baseMinimum,
+                0);
+            MinHeight = Math.Min(ActualHeight, fittedMinimum);
+            return;
+        }
+
+        // First use any free space below the window. If that cannot eliminate the
+        // overflow, preserve the window's position and reduce only the pedal image
+        // area; the bank and assignment controls retain their normal dimensions.
+        if (pass == 0 && WindowState == WindowState.Normal)
+        {
+            _windowPlacement.GrowWithinCurrentMonitor(
+                this, ActualWidth, ActualHeight + overflow + 6, _profile.IsCompactMode ? 12 : 16);
+            ScheduleNoScrollLayoutFit(layoutGeneration, pass + 1);
+            return;
+        }
+
+        var rows = UsesTabbedPedalPresentation()
+            ? 1
+            : Math.Max(1, (int)Math.Ceiling(
+                Math.Max(1, _profile.Devices.Count) / (double)GetGridColumnCount(_profile.Devices.Count)));
+        var adjusted = false;
+        foreach (var visual in _sizablePedalVisuals)
+        {
+            var reduced = LayoutFitCalculator.ReduceVisualHeight(
+                visual.MaxHeight, overflow, rows, 48, 6);
+            if (reduced >= visual.MaxHeight - 0.1) continue;
+            visual.MaxHeight = reduced;
+            adjusted = true;
+        }
+
+        if (adjusted && pass < 8)
+        {
+            ScheduleNoScrollLayoutFit(layoutGeneration, pass + 1);
+            return;
+        }
+
+        // At the practical artwork floor, keep the window from becoming any
+        // smaller even on unusually dense pedal layouts.
+        MinHeight = Math.Max(_profile.IsCompactMode ? 700 : 650, Math.Floor(ActualHeight));
+    }
+
     private bool UsesTabbedPedalPresentation() =>
         _profile.IsCompactMode || _profile.PedalLayout == PedalLayoutMode.Tabbed;
 
@@ -1966,7 +2040,7 @@ public partial class MainWindow : Window
         }
         if (_profile.PedalLayout == PedalLayoutMode.Tabbed)
         {
-            _windowPlacement.ResizeWithinCurrentMonitor(this, 1050, 900, 16);
+            _windowPlacement.GrowWithinCurrentMonitor(this, 1050, 1050, 16);
             RememberWindowPlacement();
             return;
         }
@@ -1990,15 +2064,15 @@ public partial class MainWindow : Window
             _ => sideBySide ? 1680 : 1240
         };
         var desiredHeight = _profile.PedalLayout == PedalLayoutMode.Tiled
-            ? rows switch { <= 1 => 780, 2 => 980, _ => 1040 }
+            ? rows switch { <= 1 => 1050, _ => 1400 }
             : count switch
         {
-            <= 1 => 735,
-            2 when sideBySide => 770,
-            2 => 980,
-            _ => sideBySide ? 830 : 1040
+            <= 1 => 1050,
+            2 when sideBySide => 1050,
+            2 => 1400,
+            _ => sideBySide ? 1050 : 1400
         };
-        _windowPlacement.ResizeWithinCurrentMonitor(this, desiredWidth, desiredHeight, 16);
+        _windowPlacement.GrowWithinCurrentMonitor(this, desiredWidth, desiredHeight, 16);
         RememberWindowPlacement();
     }
 

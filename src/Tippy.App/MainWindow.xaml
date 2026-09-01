@@ -93,7 +93,7 @@
             </Grid>
         </Border>
 
-        <ScrollViewer x:Name="DevicesScrollViewer" Grid.Row="2" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"
+        <ScrollViewer x:Name="DevicesScrollViewer" Grid.Row="2" VerticalScrollBarVisibility="Hidden" HorizontalScrollBarVisibility="Disabled"
                       Background="{DynamicResource BackgroundBrush}">
             <StackPanel x:Name="DevicesContent" Margin="24,22,24,30">
                 <Grid x:Name="DevicesToolbar" Margin="0,0,0,14">

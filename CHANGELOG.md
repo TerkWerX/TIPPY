@@ -47,6 +47,7 @@ Notable changes to Tippy are documented here.
 
 ### Fixed
 
+- Layout changes now preserve an already-adequate full-view window, grow only into available space on its current monitor, adapt pedal artwork when necessary, and establish a content-measured minimum height so the pedal area never shows a scrollbar.
 - The full-view command strip now wraps every command from **Open profile** through the theme toggle into a second row when the window is narrowed, keeping all commands visible and returning to one row when space permits.
 - Tightened the permanent light-gray header badge so the enlarged mascot and Tippy wordmark read as one mark with the tagline centered beneath both in light and dark themes.
 - Built-in Infinity and AltoEdge pedal artwork now decodes eagerly from embedded PNG streams, preventing blank transparent pedal cards in self-contained builds.
