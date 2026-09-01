@@ -53,7 +53,11 @@ The searchable catalog currently includes 557 commands across 32 Windows applica
 - Assign Windows actions, individual keys, key combinations, text strings, timed recordings, delays, mouse actions, program launches, and optional Xbox 360 gamepad buttons.
 - Give every switch independent press and release actions, or hold keyboard/gamepad output until physical release.
 - Hold a pedal as a momentary shift layer so the other switches temporarily use another bank.
+- Assign separate double-tap and long-press actions, repeat a command while held, or turn a held action into a safe toggle.
+- Build cross-device foot combinations and ordered foot sequences manually or record them by pressing the real pedals.
 - Select independent banks automatically for the foreground Windows application, resolved only when a pedal is pressed.
+- Send MIDI notes/CC/program changes and OSC messages to DAWs, streaming tools, lighting software, and other creative applications.
+- Hold continuous cursor movement, vertical/horizontal scrolling, and mouse-button drags underfoot.
 - Arrange pedal cards automatically, stacked, side by side, or in a tile grid with automatic or 1–6-column placement.
 - Use a distinct compact tabbed mode to show one full-size pedal at a time without losing its controls.
 - Drag pedal cards or compact tabs to match their physical order.
@@ -62,11 +66,15 @@ The searchable catalog currently includes 557 commands across 32 Windows applica
 - Send Tippy to the system tray while its pedal assignments continue running.
 - Learn unknown USB HID pedals without a driver or code change.
 - Use the bundled registry-driven artwork library, choose a picture manually for any device, and preserve unknown VID/PID details for future compatibility updates.
+- Learn keyboard-emulating pedals through device-specific Windows Raw Input without remapping the user's main keyboard.
+- Preview assignments without producing output in Rehearsal Mode.
+- Show an optional click-through active-bank/action overlay and inspect raw events, simultaneous switches, and routing latency in Live Diagnostics.
+- Keep automatic profile backups, restore earlier setups, run portably from a USB drive, and install checksum-verified pedal support packs.
 - Hot-plug devices without restarting Tippy.
 
 ## Download and run
 
-1. Download `Tippy-v0.3.0-win-x64.zip` from the [latest release](https://github.com/TerkWerX/TIPPY/releases/latest).
+1. Download the Windows x64 ZIP from the [latest release](https://github.com/TerkWerX/TIPPY/releases/latest).
 2. Extract the entire ZIP to a folder you control.
 3. Run `Tippy.exe`.
 4. Plug in a supported pedal and choose **Edit assignment** on a switch.
@@ -91,6 +99,10 @@ Every switch can have both a press action and a separate release action. Press a
 
 Assign **Switch to next bank** for hands-free cycling, or **Hold for temporary bank** for a true momentary shift layer. Use **App profiles** to map each pedal to an independent bank when a selected executable is foreground. Use **Save bank**, **Load bank**, or **Copy to…** to reuse a setup on any compatible connected pedal.
 
+The advanced behavior panel on every assignment can add a double-tap or long-press action, repeat the press action, or toggle a held action. Timing is adjustable per switch, and Tippy rejects ambiguous combinations such as toggle-plus-double-tap instead of guessing. Under **Tools**, foot patterns can combine switches across multiple pedals or recognize an ordered sequence. **Capture with feet** records the pattern from the connected hardware.
+
+The macro editor also supports continuous mouse movement and scrolling, MIDI (`note`, `cc`, and `pc`) and OSC output. Text and program fields can use `{date}`, `{time}`, `{clipboard}`, `{app}`, `{profile}`, `{device}`, `{pedal}`, `{bank}`, and custom `name=value` profile variables.
+
 Tippy autosaves its live profile here:
 
 ```text
@@ -109,7 +121,17 @@ Portable profiles use `.tippy.json`; portable banks use `.tippy-bank.json`.
 
 The learned definition stores USB identity, a report-descriptor fingerprint, and switch rules. It does not record normal keyboard typing.
 
+Pedals that enumerate as keyboards can be learned separately under **Tools → Learn keyboard-style pedal**. Tippy registers for Windows Raw Input and stores only the selected physical device path plus the virtual key emitted by each foot switch. Choose the device carefully: selecting a normal keyboard would intentionally map keys from that keyboard.
+
 Tippy also ships a data-driven pedal picture registry. The shared `VID_05F3/PID_00FF` identity cannot distinguish every Infinity/VEC/AltoEdge rebadge, so Tippy asks for the matching picture once and remembers the answer for that physical USB device. The **Picture** button permits a manual override at any time. Unknown or not-yet-verified hardware is recorded locally in `unknown_pedals.log` beside the development library, or under `%LOCALAPPDATA%\Tippy` in an installed copy.
+
+## Creative control and safety
+
+**Rehearsal Mode** runs the complete recognition and visual-feedback path but suppresses keyboard, mouse, program, MIDI, OSC, gamepad, and text output. It is useful for learning a complicated foot layout safely. The optional click-through overlay announces active application profiles, banks, gestures, and pattern actions without stealing focus from the working application or game.
+
+Tippy enforces configurable limits on macro duration, repeat duration, and step count. The default emergency stop is `Ctrl+Alt+Escape`; it cancels playback and releases held keyboard, mouse, and gamepad state. Live Diagnostics keeps at most 500 recent raw pedal events in memory and can export a privacy-safe support report containing device descriptors and timing—never typed text or macro contents.
+
+Automatic profile backups are retained under the active Tippy data directory. Portable mode is enabled from **Tools → Profile backups & portable mode** and takes effect after restarting. Checksum-verified `.tippy-pedal-pack.zip` libraries can update identity data and artwork without installing executable plug-ins. See [advanced interactions](docs/ADVANCED_INTERACTIONS.md) and the [pedal support-pack format](docs/PEDAL_SUPPORT_PACKS.md).
 
 ## Gamepad output and game rules
 

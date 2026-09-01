@@ -6,6 +6,18 @@ Notable changes to Tippy are documented here.
 
 ### Added
 
+- Adjustable per-switch double-tap, long-press, repeat-while-held, and toggle behaviors with explicit conflict validation.
+- Cross-device pedal combinations and ordered sequences, including live pattern capture from physical foot presses.
+- Continuous mouse movement, horizontal/vertical scrolling, held mouse buttons, MIDI note/CC/program output, and OSC messages.
+- Built-in and user-defined macro variables for date, time, clipboard, foreground application, profile, device, switch, and bank context.
+- Click-through bank/action overlay and Rehearsal Mode for previewing foot workflows without sending output.
+- Live diagnostics for raw reports, simultaneous presses, synthetic releases, routing latency, reconnect state, and privacy-safe JSON support reports.
+- Configurable macro duration, repeat duration, step-count limits, and a global emergency-stop shortcut.
+- Automatic rolling profile backups, one-click rollback, and restart-based portable USB mode.
+- Checksum-verified, data-only `.tippy-pedal-pack.zip` installation with traversal, type, size, and SHA-256 validation.
+- Device-specific Windows Raw Input learning for pedals that enumerate as keyboards.
+- Running-application capture in the foreground application profile editor.
+
 - Independent press and release actions on every switch, with backward-compatible migration of existing release-trigger assignments.
 - Program-launch macro steps with optional arguments and working directory.
 - True momentary shift layers: hold one switch to make the other switches use another bank, including safe multi-pedal release handling.

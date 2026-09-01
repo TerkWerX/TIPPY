@@ -18,6 +18,8 @@ public sealed class WindowsInputService
     private const uint MouseeventfXdown = 0x0080;
     private const uint MouseeventfXup = 0x0100;
     private const uint MouseeventfWheel = 0x0800;
+    private const uint MouseeventfMove = 0x0001;
+    private const uint MouseeventfHwheel = 0x01000;
 
     private static readonly IReadOnlyDictionary<string, ushort> NamedKeys =
         new Dictionary<string, ushort>(StringComparer.OrdinalIgnoreCase)
@@ -92,7 +94,33 @@ public sealed class WindowsInputService
         Send([Mouse(down, data), Mouse(up, data)]);
     }
 
+    public void MouseDown(string button)
+    {
+        var (down, _, data) = MouseButtonFlags(button);
+        Send([Mouse(down, data)]);
+    }
+
+    public void MouseUp(string button)
+    {
+        var (_, up, data) = MouseButtonFlags(button);
+        Send([Mouse(up, data)]);
+    }
+
     public void MouseWheel(int amount) => Send([Mouse(MouseeventfWheel, unchecked((uint)amount))]);
+
+    public void MouseHorizontalWheel(int amount) => Send([Mouse(MouseeventfHwheel, unchecked((uint)amount))]);
+
+    public void MouseMove(int x, int y) => Send([Mouse(MouseeventfMove, 0, x, y)]);
+
+    private static (uint Down, uint Up, uint Data) MouseButtonFlags(string button) =>
+        button.Trim().ToUpperInvariant() switch
+        {
+            "RIGHT" => (MouseeventfRightdown, MouseeventfRightup, 0u),
+            "MIDDLE" => (MouseeventfMiddledown, MouseeventfMiddleup, 0u),
+            "X1" => (MouseeventfXdown, MouseeventfXup, 1u),
+            "X2" => (MouseeventfXdown, MouseeventfXup, 2u),
+            _ => (MouseeventfLeftdown, MouseeventfLeftup, 0u)
+        };
 
     private static void SendKeys(IEnumerable<string> keys, bool up)
     {
@@ -149,10 +177,10 @@ public sealed class WindowsInputService
         }
     };
 
-    private static Input Mouse(uint flags, uint data) => new()
+    private static Input Mouse(uint flags, uint data, int x = 0, int y = 0) => new()
     {
         Type = InputMouse,
-        Data = new InputUnion { Mouse = new MouseInput { MouseData = data, Flags = flags } }
+        Data = new InputUnion { Mouse = new MouseInput { X = x, Y = y, MouseData = data, Flags = flags } }
     };
 
     private static void Send(IReadOnlyCollection<Input> inputs)

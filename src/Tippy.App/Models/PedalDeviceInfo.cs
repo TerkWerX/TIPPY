@@ -24,11 +24,13 @@ public sealed class PedalStateEventArgs(
     int switchIndex,
     bool isPressed,
     byte[] rawReport,
-    bool isSynthetic = false) : EventArgs
+    bool isSynthetic = false,
+    long receivedTimestamp = 0) : EventArgs
 {
     public PedalDeviceInfo Device { get; } = device;
     public int SwitchIndex { get; } = switchIndex;
     public bool IsPressed { get; } = isPressed;
     public byte[] RawReport { get; } = rawReport;
     public bool IsSynthetic { get; } = isSynthetic;
+    public long ReceivedTimestamp { get; } = receivedTimestamp;
 }

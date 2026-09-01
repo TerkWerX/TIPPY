@@ -27,7 +27,7 @@ Learning is intended for digital, momentary buttons. Analog axes, pressure, velo
 
 ### Keyboard-emulating pedals
 
-Pedals that already enumerate as an ordinary keyboard can trigger Windows shortcuts without Tippy. Remapping only that physical keyboard without intercepting a user's main keyboard requires a future Windows Raw Input provider; Tippy does not install a global keyboard filter driver.
+Pedals that enumerate as an ordinary keyboard can be learned through Tippy's Windows Raw Input provider. The mapping is tied to the selected physical Raw Input device path, so the same key on the user's normal keyboard is not remapped. Tippy does not install a global keyboard hook or filter driver. The learner intentionally requires the user to select a raw keyboard device and capture every switch because public USB descriptors often cannot identify these pedals reliably.
 
 ## Trigger behavior
 
@@ -49,10 +49,9 @@ Timed recordings are closed with matching key-up steps if recording stops while 
 
 1. Export/import individual learned-device definitions and extend the reviewed community registry with descriptor hashes, report samples, switch counts, and hardware verification results.
 2. Improve the armed idle-baseline learning flow with multiple press/release samples, volatile-byte masking, and a simultaneous-button validation step.
-3. Add repeat-while-held, toggle, long-press, and double-tap behaviors with explicit conflict rules.
-4. Add purpose-built adapters for popular Olympus, Philips, vPedal, and other USB transcription controls as hardware reports are verified.
-5. Add a Windows Raw Input provider for device-specific remapping of pedals that present as keyboards.
-6. Move action routing fully off the UI dispatcher and maintain press-to-output latency measurements in automated hardware tests.
+3. Add purpose-built adapters for popular Olympus, Philips, vPedal, and other USB transcription controls as hardware reports are verified.
+4. Move the remaining action routing fully off the UI dispatcher and add hardware-in-the-loop press-to-output measurements to CI lab runs.
+5. Add reviewed, signed publishing infrastructure on top of the existing checksum-verified data-only pedal pack installer.
 
 ## Performance targets
 

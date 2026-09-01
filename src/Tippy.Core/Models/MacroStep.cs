@@ -10,7 +10,10 @@ public enum MacroStepType
     MouseWheel,
     Delay,
     GamepadButton,
-    LaunchProgram
+    LaunchProgram,
+    MouseMove,
+    Midi,
+    Osc
 }
 
 public sealed class MacroStep
@@ -45,6 +48,9 @@ public sealed class MacroStep
         MacroStepType.Delay => $"Wait {Math.Clamp(DurationMs, 0, 60_000)} ms",
         MacroStepType.GamepadButton => $"Gamepad {Value ?? "A"}",
         MacroStepType.LaunchProgram => $"Run {Path.GetFileName(Value) ?? "program"}",
+        MacroStepType.MouseMove => $"Mouse {Value ?? "move"} at {Math.Abs(Amount)} px/tick",
+        MacroStepType.Midi => $"MIDI {Value ?? "message"}",
+        MacroStepType.Osc => $"OSC {Value ?? "/tippy"}",
         _ => Type.ToString()
     };
 

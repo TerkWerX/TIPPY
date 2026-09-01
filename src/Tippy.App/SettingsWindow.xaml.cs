@@ -1,6 +1,7 @@
 using System.Windows;
 using System.Windows.Input;
 using Tippy.App.Services;
+using Tippy.Core.Models;
 
 namespace Tippy.App;
 
@@ -9,7 +10,13 @@ public partial class SettingsWindow : Window
     private readonly VirtualGamepadService _gamepad;
     private bool _capturing;
 
-    public SettingsWindow(string bankHotkey, bool startMinimized, VirtualGamepadService gamepad)
+    public SettingsWindow(
+        string bankHotkey,
+        bool startMinimized,
+        VirtualGamepadService gamepad,
+        MacroSafetySettings safety,
+        OverlaySettings overlay,
+        IEnumerable<TippyVariable> variables)
     {
         InitializeComponent();
         BankHotkey = bankHotkey;
@@ -17,11 +24,23 @@ public partial class SettingsWindow : Window
         HotkeyBox.Text = bankHotkey;
         StartMinimizedCheckBox.IsChecked = startMinimized;
         GamepadStatusText.Text = gamepad.Status;
+        OverlayEnabledCheckBox.IsChecked = overlay.Enabled;
+        OverlaySecondsBox.Text = overlay.VisibleSeconds.ToString();
+        OverlayLeftBox.Text = overlay.Left.ToString("0");
+        OverlayTopBox.Text = overlay.Top.ToString("0");
+        MacroSecondsBox.Text = safety.MaximumMacroSeconds.ToString();
+        RepeatSecondsBox.Text = safety.MaximumRepeatSeconds.ToString();
+        MaximumStepsBox.Text = safety.MaximumSteps.ToString();
+        EmergencyHotkeyBox.Text = safety.EmergencyStopHotkey;
+        VariablesBox.Text = string.Join(Environment.NewLine, variables.Select(variable => $"{variable.Name}={variable.Value}"));
         PreviewKeyDown += SettingsWindow_PreviewKeyDown;
     }
 
     public string BankHotkey { get; private set; }
     public bool StartMinimized => StartMinimizedCheckBox.IsChecked == true;
+    public MacroSafetySettings Safety { get; private set; } = new();
+    public OverlaySettings Overlay { get; private set; } = new();
+    public IReadOnlyList<TippyVariable> Variables { get; private set; } = [];
 
     private void CaptureHotkey_Click(object sender, RoutedEventArgs e)
     {
@@ -82,6 +101,38 @@ public partial class SettingsWindow : Window
 
     private void Save_Click(object sender, RoutedEventArgs e)
     {
+        Safety = new MacroSafetySettings
+        {
+            MaximumMacroSeconds = Parse(MacroSecondsBox.Text, 30),
+            MaximumRepeatSeconds = Parse(RepeatSecondsBox.Text, 20),
+            MaximumSteps = Parse(MaximumStepsBox.Text, 500),
+            EmergencyStopHotkey = EmergencyHotkeyBox.Text
+        };
+        Safety.Normalize();
+        Overlay = new OverlaySettings
+        {
+            Enabled = OverlayEnabledCheckBox.IsChecked == true,
+            VisibleSeconds = Parse(OverlaySecondsBox.Text, 3),
+            Left = ParseDouble(OverlayLeftBox.Text, 24),
+            Top = ParseDouble(OverlayTopBox.Text, 24)
+        };
+        Overlay.Normalize();
+        Variables = VariablesBox.Text.Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries)
+            .Select(line =>
+            {
+                var separator = line.IndexOf('=');
+                var variable = new TippyVariable
+                {
+                    Name = separator < 0 ? line : line[..separator],
+                    Value = separator < 0 ? string.Empty : line[(separator + 1)..]
+                };
+                variable.Normalize();
+                return variable;
+            }).GroupBy(variable => variable.Name, StringComparer.OrdinalIgnoreCase)
+            .Select(group => group.Last()).ToArray();
         DialogResult = true;
     }
+
+    private static int Parse(string value, int fallback) => int.TryParse(value, out var parsed) ? parsed : fallback;
+    private static double ParseDouble(string value, double fallback) => double.TryParse(value, out var parsed) ? parsed : fallback;
 }

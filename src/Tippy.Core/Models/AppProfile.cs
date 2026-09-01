@@ -18,7 +18,7 @@ public enum PedalLayoutMode
 public sealed class AppProfile
 {
     public const int MaxBanks = 3;
-    public int SchemaVersion { get; set; } = 5;
+    public int SchemaVersion { get; set; } = 6;
     public string Name { get; set; } = "Default";
     public AppTheme Theme { get; set; } = AppTheme.Dark;
     public int ActiveBankIndex { get; set; }
@@ -30,11 +30,16 @@ public sealed class AppProfile
     public List<PedalDeviceProfile> Devices { get; set; } = [];
     public List<LearnedPedalDefinition> LearnedPedals { get; set; } = [];
     public List<ApplicationProfileRule> ApplicationProfiles { get; set; } = [];
+    public List<PedalPatternDefinition> PedalPatterns { get; set; } = [];
+    public List<TippyVariable> Variables { get; set; } = [];
+    public MacroSafetySettings Safety { get; set; } = new();
+    public OverlaySettings Overlay { get; set; } = new();
+    public List<RawInputPedalDefinition> RawInputPedals { get; set; } = [];
 
     public void Normalize()
     {
         var previousSchema = SchemaVersion;
-        SchemaVersion = 5;
+        SchemaVersion = 6;
         Name = string.IsNullOrWhiteSpace(Name) ? "Default" : Name.Trim();
         ActiveBankIndex = Math.Clamp(ActiveBankIndex, 0, MaxBanks - 1);
         BankHotkey = string.IsNullOrWhiteSpace(BankHotkey) ? "Ctrl+Alt+B" : BankHotkey.Trim();
@@ -43,6 +48,11 @@ public sealed class AppProfile
         Devices ??= [];
         LearnedPedals ??= [];
         ApplicationProfiles ??= [];
+        PedalPatterns ??= [];
+        Variables ??= [];
+        Safety ??= new MacroSafetySettings();
+        Overlay ??= new OverlaySettings();
+        RawInputPedals ??= [];
         foreach (var learned in LearnedPedals)
         {
             learned.Normalize();
@@ -51,6 +61,11 @@ public sealed class AppProfile
         {
             applicationProfile.Normalize();
         }
+        foreach (var pattern in PedalPatterns) pattern.Normalize();
+        foreach (var variable in Variables) variable.Normalize();
+        Safety.Normalize();
+        Overlay.Normalize();
+        foreach (var rawInputPedal in RawInputPedals) rawInputPedal.Normalize();
         foreach (var device in Devices)
         {
             if (previousSchema < 3)

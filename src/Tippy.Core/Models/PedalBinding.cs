@@ -15,6 +15,7 @@ public sealed class PedalBinding
     public PedalBindingType Type { get; set; } = PedalBindingType.Macro;
     public MacroDefinition Macro { get; set; } = new();
     public MacroDefinition ReleaseMacro { get; set; } = EmptyReleaseMacro();
+    public PedalGestureSettings Gestures { get; set; } = new();
     public int ShiftBankIndex { get; set; } = 1;
 
     public void Normalize()
@@ -22,7 +23,9 @@ public sealed class PedalBinding
         Macro ??= new MacroDefinition();
         Macro.Normalize();
         ReleaseMacro ??= EmptyReleaseMacro();
+        Gestures ??= new PedalGestureSettings();
         ReleaseMacro.Normalize();
+        Gestures.Normalize();
         ShiftBankIndex = Math.Clamp(ShiftBankIndex, 0, AppProfile.MaxBanks - 1);
 
         // Schema 4 stored release-only behavior in the main macro. Move it
@@ -53,6 +56,7 @@ public sealed class PedalBinding
         Type = Type,
         Macro = Macro.Clone(),
         ReleaseMacro = ReleaseMacro.Clone(),
+        Gestures = Gestures.Clone(),
         ShiftBankIndex = ShiftBankIndex
     };
 
@@ -63,6 +67,11 @@ public sealed class PedalBinding
     public bool HasReleaseAction => Type == PedalBindingType.Macro && ReleaseMacro.Steps.Count > 0;
 
     [JsonIgnore]
+    public bool HasGestureAction => Type == PedalBindingType.Macro &&
+        (Gestures.DoubleTapMacro.Steps.Count > 0 || Gestures.LongPressMacro.Steps.Count > 0 ||
+         Gestures.RepeatWhileHeld || Gestures.Toggle);
+
+    [JsonIgnore]
     public string DisplayName => Type switch
     {
         PedalBindingType.BankNext => "Next bank",
@@ -70,6 +79,8 @@ public sealed class PedalBinding
         PedalBindingType.ShiftLayer => $"Shift to Bank {ShiftBankIndex + 1}",
         _ when HasPressAction => Macro.Name,
         _ when HasReleaseAction => ReleaseMacro.Name,
+        _ when Gestures.DoubleTapMacro.Steps.Count > 0 => Gestures.DoubleTapMacro.Name,
+        _ when Gestures.LongPressMacro.Steps.Count > 0 => Gestures.LongPressMacro.Name,
         _ => "No action"
     };
 
@@ -79,11 +90,21 @@ public sealed class PedalBinding
         PedalBindingType.BankNext => "Cycle to the next macro bank",
         PedalBindingType.Disabled => "This switch does nothing",
         PedalBindingType.ShiftLayer => $"Hold for Bank {ShiftBankIndex + 1}; release to restore",
-        _ when HasPressAction && HasReleaseAction => $"Press: {Macro.Summary} · Release: {ReleaseMacro.Summary}",
-        _ when HasPressAction => $"Press: {Macro.Summary}",
-        _ when HasReleaseAction => $"Release: {ReleaseMacro.Summary}",
+        _ when HasPressAction || HasReleaseAction || HasGestureAction => BuildMacroSummary(),
         _ => "No action"
     };
+
+    private string BuildMacroSummary()
+    {
+        var parts = new List<string>();
+        if (HasPressAction) parts.Add($"Press: {Macro.Summary}");
+        if (Gestures.DoubleTapMacro.Steps.Count > 0) parts.Add($"Double: {Gestures.DoubleTapMacro.Summary}");
+        if (Gestures.LongPressMacro.Steps.Count > 0) parts.Add($"Hold: {Gestures.LongPressMacro.Summary}");
+        if (Gestures.RepeatWhileHeld) parts.Add("Repeat while held");
+        if (Gestures.Toggle) parts.Add("Toggle on/off");
+        if (HasReleaseAction) parts.Add($"Release: {ReleaseMacro.Summary}");
+        return string.Join(" · ", parts);
+    }
 
     private static MacroDefinition EmptyReleaseMacro() => new()
     {

@@ -221,11 +221,12 @@ public sealed partial class PedalRegistryService
         if (!string.IsNullOrWhiteSpace(_preferredDirectory)) yield return _preferredDirectory;
         var configured = Environment.GetEnvironmentVariable("TIPPY_PEDAL_LIBRARY");
         if (!string.IsNullOrWhiteSpace(configured)) yield return configured;
+        yield return Path.Combine(AppContext.BaseDirectory, "TippyData", "PedalLibrary");
+        yield return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            "Tippy", "PedalLibrary");
         yield return Path.Combine(AppContext.BaseDirectory, "PedalLibrary");
         yield return Path.Combine(Directory.GetCurrentDirectory(), "Claude", "pedals");
         yield return @"F:\TIPPY\Claude\pedals";
-        yield return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-            "Tippy", "PedalLibrary");
     }
 
     [GeneratedRegex("[0-9A-Fa-f]{4}")]

@@ -1,7 +1,7 @@
 <Window x:Class="Tippy.App.MacroEditorWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Width="860" Height="760" MinWidth="720" MinHeight="630"
+        Width="900" Height="850" MinWidth="740" MinHeight="680"
         WindowStartupLocation="CenterOwner" ShowInTaskbar="False"
         Background="{DynamicResource BackgroundBrush}" Foreground="{DynamicResource TextBrush}">
     <Grid Margin="22">
@@ -55,6 +55,30 @@
                         <Button Content="Edit release" Click="EditReleaseAction_Click" Margin="0,0,7,0"/>
                         <Button x:Name="ClearReleaseButton" Content="Clear" Click="ClearReleaseAction_Click"/>
                     </StackPanel>
+                </Grid>
+            </Border>
+            <Border x:Name="GestureActionsBorder" Background="{DynamicResource SurfaceAltBrush}" BorderBrush="{DynamicResource BorderBrush}"
+                    BorderThickness="1" CornerRadius="8" Padding="12" Margin="0,8,0,0">
+                <Grid>
+                    <Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                    <StackPanel>
+                        <TextBlock Text="ADVANCED FOOT BEHAVIORS" Style="{StaticResource SmallMutedText}" FontWeight="Bold"/>
+                        <TextBlock x:Name="GestureSummary" Text="Standard press/release" Margin="0,4,12,0" TextTrimming="CharacterEllipsis"/>
+                        <StackPanel Orientation="Horizontal" Margin="0,7,0,0">
+                            <CheckBox x:Name="RepeatCheckBox" Content="Repeat press action while held" Margin="0,0,18,0"/>
+                            <CheckBox x:Name="ToggleCheckBox" Content="Toggle held action on/off"/>
+                        </StackPanel>
+                        <WrapPanel Margin="0,7,0,0">
+                            <TextBlock Text="Double window" VerticalAlignment="Center" Margin="0,0,5,0"/><TextBox x:Name="DoubleWindowBox" Width="48" Margin="0,0,4,0"/><TextBlock Text="ms" VerticalAlignment="Center" Margin="0,0,12,0"/>
+                            <TextBlock Text="Long press" VerticalAlignment="Center" Margin="0,0,5,0"/><TextBox x:Name="LongThresholdBox" Width="48" Margin="0,0,4,0"/><TextBlock Text="ms" VerticalAlignment="Center" Margin="0,0,12,0"/>
+                            <TextBlock Text="Repeat delay / interval" VerticalAlignment="Center" Margin="0,0,5,0"/><TextBox x:Name="RepeatDelayBox" Width="48" Margin="0,0,4,0"/><TextBlock Text="/" VerticalAlignment="Center" Margin="0,0,4,0"/><TextBox x:Name="RepeatIntervalBox" Width="48" Margin="0,0,4,0"/><TextBlock Text="ms" VerticalAlignment="Center"/>
+                        </WrapPanel>
+                    </StackPanel>
+                    <WrapPanel Grid.Column="1" VerticalAlignment="Center" HorizontalAlignment="Right">
+                        <Button Content="Double tap" Click="EditDoubleTap_Click" Margin="0,0,6,6"/>
+                        <Button Content="Long press" Click="EditLongPress_Click" Margin="0,0,6,6"/>
+                        <Button Content="Clear gestures" Click="ClearGestures_Click" Margin="0,0,0,6"/>
+                    </WrapPanel>
                 </Grid>
             </Border>
         </StackPanel>
@@ -152,7 +176,7 @@
                     <Grid Grid.Row="1" Margin="0,12"><Grid.ColumnDefinitions><ColumnDefinition/><ColumnDefinition Width="8"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><TextBox x:Name="TextStringBox" Padding="8" ToolTip="Text Tippy will type exactly as entered"/><Button Grid.Column="2" Content="Add typed string" Click="AddString_Click"/></Grid>
                     <TextBlock Grid.Row="2" Text="MACRO STEPS" Style="{StaticResource SmallMutedText}" FontWeight="Bold" Margin="0,0,0,7"/>
                     <ListBox x:Name="StepsList" Grid.Row="3" SelectionMode="Single" Padding="5"/>
-                    <WrapPanel Grid.Row="4" Margin="0,10,0,0"><Button x:Name="RecordButton" Content="Start timed recording" Click="Record_Click" Margin="0,0,7,7" Background="{DynamicResource AccentSoftBrush}"/><Button x:Name="CaptureButton" Content="Capture shortcut" Click="CaptureShortcut_Click" Margin="0,0,7,7"/><Button Content="Type text" Click="AddText_Click" Margin="0,0,7,7"/><Button Content="Wait" Click="AddDelay_Click" Margin="0,0,7,7"/><Button Content="Mouse" Click="AddMouse_Click" Margin="0,0,7,7"/><Button Content="Gamepad" Click="AddGamepad_Click" Margin="0,0,7,7"/><Button Content="Program" Click="AddProgram_Click" Margin="0,0,7,7"/></WrapPanel>
+                    <WrapPanel Grid.Row="4" Margin="0,10,0,0"><Button x:Name="RecordButton" Content="Start timed recording" Click="Record_Click" Margin="0,0,7,7" Background="{DynamicResource AccentSoftBrush}"/><Button x:Name="CaptureButton" Content="Capture shortcut" Click="CaptureShortcut_Click" Margin="0,0,7,7"/><Button Content="Type text" Click="AddText_Click" Margin="0,0,7,7"/><Button Content="Wait" Click="AddDelay_Click" Margin="0,0,7,7"/><Button Content="Mouse / scroll" Click="AddMouse_Click" Margin="0,0,7,7"/><Button Content="Gamepad" Click="AddGamepad_Click" Margin="0,0,7,7"/><Button Content="Program" Click="AddProgram_Click" Margin="0,0,7,7"/><Button Content="MIDI" Click="AddMidi_Click" Margin="0,0,7,7"/><Button Content="OSC" Click="AddOsc_Click" Margin="0,0,7,7"/></WrapPanel>
                     <Grid Grid.Row="5" Margin="0,3,0,0"><TextBlock x:Name="CaptureHint" Text="Steps run from top to bottom." Style="{StaticResource SmallMutedText}" VerticalAlignment="Center"/><StackPanel Orientation="Horizontal" HorizontalAlignment="Right"><Button Content="↑" Click="MoveUp_Click" Padding="10,5" Margin="0,0,5,0"/><Button Content="↓" Click="MoveDown_Click" Padding="10,5" Margin="0,0,5,0"/><Button Content="Remove" Click="RemoveStep_Click" Padding="10,5"/></StackPanel></Grid>
                 </Grid>
             </TabItem>

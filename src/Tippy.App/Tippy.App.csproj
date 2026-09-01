@@ -10,7 +10,7 @@
     <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
     <AssemblyName>Tippy</AssemblyName>
     <RootNamespace>Tippy.App</RootNamespace>
-    <Version>0.3.0</Version>
+    <Version>0.4.0</Version>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <ApplicationIcon>Assets\Icons\tippy.ico</ApplicationIcon>
     <PublishSingleFile>true</PublishSingleFile>

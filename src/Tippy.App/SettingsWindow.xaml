@@ -1,11 +1,12 @@
 <Window x:Class="Tippy.App.SettingsWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="Tippy settings" Width="560" Height="470" ResizeMode="NoResize"
+        Title="Tippy settings" Width="680" Height="700" ResizeMode="CanResize" MinWidth="620" MinHeight="620"
         WindowStartupLocation="CenterOwner" ShowInTaskbar="False"
         Background="{DynamicResource BackgroundBrush}" Foreground="{DynamicResource TextBrush}">
     <Grid Margin="24">
         <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
@@ -46,10 +47,31 @@
                 <Button Grid.Column="1" Content="Test driver" Click="TestGamepad_Click" VerticalAlignment="Center"/>
             </Grid>
         </Border>
-        <TextBlock Grid.Row="3" Text="Keyboard and mouse macros work without another driver. Gamepad steps need ViGEmBus 1.22 or a compatible virtual-controller bus installed; Tippy never installs a kernel driver automatically."
+        <Border Grid.Row="3" Background="{DynamicResource SurfaceBrush}" BorderBrush="{DynamicResource BorderBrush}"
+                BorderThickness="1" CornerRadius="9" Padding="15" Margin="0,12,0,0">
+            <StackPanel>
+                <TextBlock Text="OVERLAY, VARIABLES &amp; SAFETY" Style="{StaticResource SmallMutedText}" FontWeight="Bold"/>
+                <CheckBox x:Name="OverlayEnabledCheckBox" Content="Show a click-through bank/action overlay" Margin="0,9,0,0"/>
+                <WrapPanel Margin="0,8,0,0">
+                    <TextBlock Text="Visible seconds" VerticalAlignment="Center" Margin="0,0,7,0"/><TextBox x:Name="OverlaySecondsBox" Width="48" Margin="0,0,16,0"/>
+                    <TextBlock Text="X" VerticalAlignment="Center" Margin="0,0,7,0"/><TextBox x:Name="OverlayLeftBox" Width="64" Margin="0,0,16,0"/>
+                    <TextBlock Text="Y" VerticalAlignment="Center" Margin="0,0,7,0"/><TextBox x:Name="OverlayTopBox" Width="64"/>
+                </WrapPanel>
+                <WrapPanel Margin="0,12,0,0">
+                    <TextBlock Text="Max macro seconds" VerticalAlignment="Center" Margin="0,0,7,0"/><TextBox x:Name="MacroSecondsBox" Width="58" Margin="0,0,16,0"/>
+                    <TextBlock Text="Max repeat seconds" VerticalAlignment="Center" Margin="0,0,7,0"/><TextBox x:Name="RepeatSecondsBox" Width="58" Margin="0,0,16,0"/>
+                    <TextBlock Text="Max steps" VerticalAlignment="Center" Margin="0,0,7,0"/><TextBox x:Name="MaximumStepsBox" Width="68"/>
+                </WrapPanel>
+                <TextBlock Text="Emergency-stop shortcut" Margin="0,10,0,4"/><TextBox x:Name="EmergencyHotkeyBox"/>
+                <TextBlock Text="PROFILE VARIABLES — one name=value per line. Use {name}, {date}, {time}, {clipboard}, {app}, {device}, {pedal}, or {bank} in text and program fields."
+                           Style="{StaticResource SmallMutedText}" TextWrapping="Wrap" Margin="0,10,0,4"/>
+                <TextBox x:Name="VariablesBox" AcceptsReturn="True" Height="76" VerticalScrollBarVisibility="Auto" FontFamily="Consolas"/>
+            </StackPanel>
+        </Border>
+        <TextBlock Grid.Row="4" Text="Keyboard and mouse macros work without another driver. Gamepad steps need ViGEmBus 1.22 or a compatible virtual-controller bus installed; Tippy never installs a kernel driver automatically."
                    TextWrapping="Wrap" Style="{StaticResource SmallMutedText}" Margin="0,12,0,0"/>
 
-        <StackPanel Grid.Row="4" Orientation="Horizontal" HorizontalAlignment="Right">
+        <StackPanel Grid.Row="5" Orientation="Horizontal" HorizontalAlignment="Right">
             <Button Content="Cancel" IsCancel="True" Margin="0,0,8,0"/>
             <Button Content="Save settings" Click="Save_Click" Background="{DynamicResource AccentBrush}" Foreground="#101820"/>
         </StackPanel>

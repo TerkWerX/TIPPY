@@ -131,6 +131,50 @@ public partial class ApplicationProfilesWindow : Window
         RefreshList(_working.Count - 1);
     }
 
+    private void AddRunningProfile_Click(object sender, RoutedEventArgs e)
+    {
+        SaveCurrentEditor();
+        var applications = System.Diagnostics.Process.GetProcesses()
+            .Where(process => process.Id != Environment.ProcessId && process.MainWindowHandle != IntPtr.Zero)
+            .Select(process =>
+            {
+                try
+                {
+                    return (Label: $"{process.ProcessName}.exe · {process.MainWindowTitle}",
+                        Name: process.ProcessName,
+                        Path: process.MainModule?.FileName ?? string.Empty);
+                }
+                catch { return (Label: $"{process.ProcessName}.exe · {process.MainWindowTitle}", Name: process.ProcessName, Path: string.Empty); }
+                finally { process.Dispose(); }
+            })
+            .DistinctBy(item => item.Name, StringComparer.OrdinalIgnoreCase)
+            .OrderBy(item => item.Name, StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+        if (applications.Length == 0)
+        {
+            MessageBox.Show(this, "No other visible desktop applications were found.", "Running applications");
+            return;
+        }
+        var choice = PromptDialog.Choose(this, "Running application", "Choose the application to capture",
+            applications.Select(item => item.Label).ToArray());
+        var selected = applications.FirstOrDefault(item => item.Label == choice);
+        if (string.IsNullOrWhiteSpace(selected.Name)) return;
+        var profile = new ApplicationProfileRule
+        {
+            Name = selected.Name,
+            ProcessName = selected.Name,
+            ExecutablePath = selected.Path,
+            DeviceBanks = _devices.Select(device => new ApplicationDeviceBank
+            {
+                DeviceKey = device.DeviceKey,
+                BankIndex = device.ActiveBankIndex
+            }).ToList()
+        };
+        profile.Normalize();
+        _working.Add(profile);
+        RefreshList(_working.Count - 1);
+    }
+
     private void RemoveProfile_Click(object sender, RoutedEventArgs e)
     {
         var index = ProfilesList.SelectedIndex;

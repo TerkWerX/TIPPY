@@ -179,7 +179,8 @@ public sealed class PedalHidService : IDisposable
 
     private void OnStateChanged(PedalDeviceInfo info, PedalTransition transition, byte[] report, bool isSynthetic) =>
         StateChanged?.Invoke(this,
-            new PedalStateEventArgs(info, transition.SwitchIndex, transition.IsPressed, report, isSynthetic));
+            new PedalStateEventArgs(info, transition.SwitchIndex, transition.IsPressed, report, isSynthetic,
+                System.Diagnostics.Stopwatch.GetTimestamp()));
 
     private void OnReaderStopped(DeviceReader stopped, string? reason)
     {

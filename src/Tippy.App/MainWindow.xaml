@@ -41,6 +41,7 @@
                     <Button Content="App profiles" Click="ApplicationProfiles_Click" Margin="0,0,8,0"/>
                     <Button Content="Settings" Click="Settings_Click" Margin="0,0,8,0"/>
                     <Button Content="To tray" Click="MinimizeToTray_Click" Margin="0,0,8,0" ToolTip="Keep Tippy running in the notification area"/>
+                    <Button Content="Tools" Click="Tools_Click" Margin="0,0,8,0"/>
                     <Button Content="Help" Click="Help_Click" Margin="0,0,8,0"/>
                     <Button x:Name="ThemeButton" Content="Light mode" Click="Theme_Click"/>
                 </StackPanel>
@@ -109,7 +110,7 @@
                         BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="10" Padding="35" Visibility="Collapsed">
                     <StackPanel HorizontalAlignment="Center">
                         <TextBlock Text="No compatible foot controls found" FontSize="18" FontWeight="SemiBold" HorizontalAlignment="Center"/>
-                        <TextBlock Text="Plug in an Infinity / AltoEdge Version 14 pedal, then choose Scan USB."
+                        <TextBlock Text="Plug in a supported pedal, choose Scan USB, or use Learn new pedal / Tools for Raw Input hardware."
                                    Style="{StaticResource SmallMutedText}" Margin="0,8,0,0"/>
                     </StackPanel>
                 </Border>

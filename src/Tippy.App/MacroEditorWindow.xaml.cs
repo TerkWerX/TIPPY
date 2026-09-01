@@ -15,6 +15,7 @@ public partial class MacroEditorWindow : Window
 {
     private readonly PedalBinding _working;
     private readonly bool _releaseOnly;
+    private readonly string? _gestureTarget;
     private readonly IReadOnlyList<KnownWindowsAction> _knownActions = WindowsActionCatalog.Create();
     private readonly IReadOnlyList<ApplicationShortcutProfile> _applications = ApplicationShortcutCatalog.Create();
     private readonly Stopwatch _recordingClock = new();
@@ -27,13 +28,14 @@ public partial class MacroEditorWindow : Window
     private bool _recording;
     private long _lastRecordedMilliseconds;
 
-    public MacroEditorWindow(PedalBinding source) : this(source, false)
+    public MacroEditorWindow(PedalBinding source) : this(source, false, null)
     {
     }
 
-    private MacroEditorWindow(PedalBinding source, bool releaseOnly)
+    private MacroEditorWindow(PedalBinding source, bool releaseOnly, string? gestureTarget = null)
     {
         _releaseOnly = releaseOnly;
+        _gestureTarget = gestureTarget;
         _working = source.Clone();
         _working.Normalize();
         Result = source.Clone();
@@ -54,6 +56,10 @@ public partial class MacroEditorWindow : Window
             UpdateApplicationCount();
             RefreshSteps();
             RefreshReleaseSummary();
+            RepeatCheckBox.IsChecked = _working.Gestures.RepeatWhileHeld;
+            ToggleCheckBox.IsChecked = _working.Gestures.Toggle;
+            LoadGestureTiming();
+            RefreshGestureSummary();
             UpdateMacroVisibility();
             if (_releaseOnly)
             {
@@ -62,6 +68,16 @@ public partial class MacroEditorWindow : Window
                 BindingTypePanel.Visibility = Visibility.Collapsed;
                 TriggerModePanel.Visibility = Visibility.Collapsed;
                 ReleaseActionBorder.Visibility = Visibility.Collapsed;
+                GestureActionsBorder.Visibility = Visibility.Collapsed;
+            }
+            else if (_gestureTarget is not null)
+            {
+                AssignmentHeading.Text = _gestureTarget == "double" ? "Double-tap action" : "Long-press action";
+                AssignmentSubtitle.Text = "Build the action for this foot gesture.";
+                BindingTypePanel.Visibility = Visibility.Collapsed;
+                TriggerModePanel.Visibility = Visibility.Collapsed;
+                ReleaseActionBorder.Visibility = Visibility.Collapsed;
+                GestureActionsBorder.Visibility = Visibility.Collapsed;
             }
         };
         PreviewKeyDown += MacroEditorWindow_PreviewKeyDown;
@@ -70,14 +86,20 @@ public partial class MacroEditorWindow : Window
 
     public PedalBinding Result { get; private set; }
 
-    private MacroDefinition CurrentMacro => _releaseOnly ? _working.ReleaseMacro : _working.Macro;
+    private MacroDefinition CurrentMacro => _releaseOnly
+        ? _working.ReleaseMacro
+        : _gestureTarget == "double"
+            ? _working.Gestures.DoubleTapMacro
+            : _gestureTarget == "long"
+                ? _working.Gestures.LongPressMacro
+                : _working.Macro;
 
     private void BindingTypeBox_SelectionChanged(object sender, SelectionChangedEventArgs e) => UpdateMacroVisibility();
 
     private void UpdateMacroVisibility()
     {
         if (MacroArea is null) return;
-        var type = _releaseOnly ? PedalBindingType.Macro : SelectedBindingType();
+        var type = _releaseOnly || _gestureTarget is not null ? PedalBindingType.Macro : SelectedBindingType();
         var isMacro = type == PedalBindingType.Macro;
         MacroArea.IsEnabled = isMacro;
         TriggerModeBox.IsEnabled = isMacro && !_releaseOnly;
@@ -85,9 +107,10 @@ public partial class MacroEditorWindow : Window
         ShiftBankPanel.Visibility = !_releaseOnly && type == PedalBindingType.ShiftLayer
             ? Visibility.Visible
             : Visibility.Collapsed;
-        if (!_releaseOnly)
+        if (!_releaseOnly && _gestureTarget is null)
         {
             ReleaseActionBorder.Visibility = isMacro ? Visibility.Visible : Visibility.Collapsed;
+            GestureActionsBorder.Visibility = isMacro ? Visibility.Visible : Visibility.Collapsed;
         }
     }
 
@@ -346,15 +369,51 @@ public partial class MacroEditorWindow : Window
     private void AddMouse_Click(object sender, RoutedEventArgs e)
     {
         var choice = PromptDialog.Choose(this, "Mouse action", "Choose a mouse action",
-            ["Left click", "Right click", "Middle click", "Wheel up", "Wheel down"]);
+            ["Left click", "Right click", "Middle click", "Wheel up", "Wheel down", "Scroll left", "Scroll right",
+             "Move up", "Move down", "Move left", "Move right"]);
         if (choice is null) return;
         var step = choice switch
         {
             "Wheel up" => new MacroStep { Type = MacroStepType.MouseWheel, Amount = 120 },
             "Wheel down" => new MacroStep { Type = MacroStepType.MouseWheel, Amount = -120 },
+            "Scroll left" => new MacroStep { Type = MacroStepType.MouseWheel, Value = "Horizontal", Amount = -120, DurationMs = 90 },
+            "Scroll right" => new MacroStep { Type = MacroStepType.MouseWheel, Value = "Horizontal", Amount = 120, DurationMs = 90 },
+            "Move up" => new MacroStep { Type = MacroStepType.MouseMove, Value = "Up", Amount = 8 },
+            "Move down" => new MacroStep { Type = MacroStepType.MouseMove, Value = "Down", Amount = 8 },
+            "Move left" => new MacroStep { Type = MacroStepType.MouseMove, Value = "Left", Amount = 8 },
+            "Move right" => new MacroStep { Type = MacroStepType.MouseMove, Value = "Right", Amount = 8 },
             _ => new MacroStep { Type = MacroStepType.MouseButton, Value = choice.Replace(" click", string.Empty) }
         };
         CurrentMacro.Steps.Add(step);
+        RefreshSteps(CurrentMacro.Steps.Count - 1);
+    }
+
+    private void AddMidi_Click(object sender, RoutedEventArgs e)
+    {
+        var value = PromptDialog.Ask(this, "MIDI output",
+            "Message: note:channel:number:velocity, cc:channel:controller:value, or pc:channel:program",
+            "note:1:60:127");
+        if (value is null) return;
+        CurrentMacro.Steps.Add(new MacroStep { Type = MacroStepType.Midi, Value = value });
+        RefreshSteps(CurrentMacro.Steps.Count - 1);
+    }
+
+    private void AddOsc_Click(object sender, RoutedEventArgs e)
+    {
+        var address = PromptDialog.Ask(this, "OSC output", "OSC address (must begin with /)", "/tippy/pedal");
+        if (address is null) return;
+        var values = PromptDialog.Ask(this, "OSC values", "Comma-separated text, integer, or decimal values", "1");
+        if (values is null) return;
+        var endpoint = PromptDialog.Ask(this, "OSC destination", "Host:port", "127.0.0.1:8000");
+        if (endpoint is null) return;
+        var separator = endpoint.LastIndexOf(':');
+        var host = separator > 0 ? endpoint[..separator] : endpoint;
+        var port = separator > 0 && int.TryParse(endpoint[(separator + 1)..], out var parsed) ? parsed : 8000;
+        CurrentMacro.Steps.Add(new MacroStep
+        {
+            Type = MacroStepType.Osc, Value = address, Arguments = values,
+            WorkingDirectory = host, Amount = Math.Clamp(port, 1, 65535)
+        });
         RefreshSteps(CurrentMacro.Steps.Count - 1);
     }
 
@@ -399,6 +458,52 @@ public partial class MacroEditorWindow : Window
         if (editor.ShowDialog() != true) return;
         _working.ReleaseMacro = editor.Result.ReleaseMacro.Clone();
         RefreshReleaseSummary();
+    }
+
+    private void EditDoubleTap_Click(object sender, RoutedEventArgs e) => EditGesture("double");
+
+    private void EditLongPress_Click(object sender, RoutedEventArgs e) => EditGesture("long");
+
+    private void EditGesture(string target)
+    {
+        _working.Macro.Name = string.IsNullOrWhiteSpace(NameBox.Text) ? "Unnamed macro" : NameBox.Text.Trim();
+        var editor = new MacroEditorWindow(_working, false, target)
+        {
+            Owner = this,
+            Title = $"{(target == "double" ? "Double tap" : "Long press")} · {Title}"
+        };
+        if (editor.ShowDialog() != true) return;
+        _working.Gestures = editor.Result.Gestures.Clone();
+        RefreshGestureSummary();
+    }
+
+    private void ClearGestures_Click(object sender, RoutedEventArgs e)
+    {
+        _working.Gestures = new PedalGestureSettings();
+        RepeatCheckBox.IsChecked = false;
+        ToggleCheckBox.IsChecked = false;
+        LoadGestureTiming();
+        RefreshGestureSummary();
+    }
+
+    private void LoadGestureTiming()
+    {
+        if (DoubleWindowBox is null) return;
+        DoubleWindowBox.Text = _working.Gestures.DoubleTapWindowMs.ToString();
+        LongThresholdBox.Text = _working.Gestures.LongPressThresholdMs.ToString();
+        RepeatDelayBox.Text = _working.Gestures.RepeatDelayMs.ToString();
+        RepeatIntervalBox.Text = _working.Gestures.RepeatIntervalMs.ToString();
+    }
+
+    private void RefreshGestureSummary()
+    {
+        if (GestureSummary is null) return;
+        var actions = new List<string>();
+        if (_working.Gestures.DoubleTapMacro.Steps.Count > 0) actions.Add($"Double: {_working.Gestures.DoubleTapMacro.Name}");
+        if (_working.Gestures.LongPressMacro.Steps.Count > 0) actions.Add($"Hold: {_working.Gestures.LongPressMacro.Name}");
+        if (_working.Gestures.RepeatWhileHeld) actions.Add("repeat");
+        if (_working.Gestures.Toggle) actions.Add("toggle");
+        GestureSummary.Text = actions.Count == 0 ? "Standard press/release" : string.Join(" · ", actions);
     }
 
     private void ClearReleaseAction_Click(object sender, RoutedEventArgs e)
@@ -465,11 +570,11 @@ public partial class MacroEditorWindow : Window
     private void Save_Click(object sender, RoutedEventArgs e)
     {
         CurrentMacro.Name = string.IsNullOrWhiteSpace(NameBox.Text) ? "Unnamed macro" : NameBox.Text.Trim();
-        if (_releaseOnly)
+        if (_releaseOnly || _gestureTarget is not null)
         {
-            CurrentMacro.TriggerMode = MacroTriggerMode.ReleaseOnce;
+            CurrentMacro.TriggerMode = _releaseOnly ? MacroTriggerMode.ReleaseOnce : MacroTriggerMode.PressOnce;
             if (CurrentMacro.Steps.Count == 0 && MessageBox.Show(this,
-                    "This release action has no steps. Save it anyway?", "Empty release action",
+                    "This action has no steps. Save it anyway?", "Empty action",
                     MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes) return;
             Result = _working.Clone();
             DialogResult = true;
@@ -479,6 +584,32 @@ public partial class MacroEditorWindow : Window
         _working.Type = SelectedBindingType();
         _working.ShiftBankIndex = Math.Clamp(ShiftBankBox.SelectedIndex, 0, AppProfile.MaxBanks - 1);
         _working.Macro.TriggerMode = SelectedTriggerMode();
+        _working.Gestures.RepeatWhileHeld = RepeatCheckBox.IsChecked == true;
+        _working.Gestures.Toggle = ToggleCheckBox.IsChecked == true;
+        _working.Gestures.DoubleTapWindowMs = ParseTiming(DoubleWindowBox.Text, 320);
+        _working.Gestures.LongPressThresholdMs = ParseTiming(LongThresholdBox.Text, 550);
+        _working.Gestures.RepeatDelayMs = ParseTiming(RepeatDelayBox.Text, 450);
+        _working.Gestures.RepeatIntervalMs = ParseTiming(RepeatIntervalBox.Text, 110);
+        var hasDouble = _working.Gestures.DoubleTapMacro.Steps.Count > 0;
+        var hasLong = _working.Gestures.LongPressMacro.Steps.Count > 0;
+        if (_working.Gestures.Toggle && (_working.Gestures.RepeatWhileHeld || hasDouble || hasLong))
+        {
+            MessageBox.Show(this, "Toggle is a complete press behavior. Turn off repeat and clear double-tap/long-press actions before enabling toggle.",
+                "Conflicting foot behaviors", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+        if (_working.Gestures.RepeatWhileHeld && (hasDouble || hasLong))
+        {
+            MessageBox.Show(this, "Repeat cannot be combined with double-tap or long-press recognition on the same switch.",
+                "Conflicting foot behaviors", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+        if ((hasDouble || hasLong) && _working.Macro.TriggerMode == MacroTriggerMode.WhileHeld)
+        {
+            MessageBox.Show(this, "Double-tap and long-press recognition require a run-once tap action. Choose Run once when pressed.",
+                "Conflicting foot behaviors", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
         if (_working.Type == PedalBindingType.Macro &&
             _working.Macro.Steps.Count == 0 && _working.ReleaseMacro.Steps.Count == 0 &&
             MessageBox.Show(this, "This switch has no press or release steps. Save it anyway?", "Empty assignment",
@@ -488,10 +619,10 @@ public partial class MacroEditorWindow : Window
         }
         if (_working.Type == PedalBindingType.Macro &&
             _working.Macro.TriggerMode == MacroTriggerMode.WhileHeld &&
-            _working.Macro.Steps.Any(step => step.Type is not (MacroStepType.KeyChord or MacroStepType.KeyDown or MacroStepType.GamepadButton)))
+            _working.Macro.Steps.Any(step => step.Type is not (MacroStepType.KeyChord or MacroStepType.KeyDown or MacroStepType.GamepadButton or MacroStepType.MouseButton or MacroStepType.MouseMove or MacroStepType.MouseWheel)))
         {
             MessageBox.Show(this,
-                "Hold-until-release press actions can contain only keyboard shortcuts and gamepad buttons. Remove text, wait, mouse, program, and wheel steps, or choose Run once.",
+                "Hold-until-release actions support keyboard, gamepad, mouse-button, mouse-movement, and scrolling steps. Remove text, waits, program, MIDI, and OSC steps, or choose Run once.",
                 "Hold macro", MessageBoxButton.OK, MessageBoxImage.Warning);
             return;
         }
@@ -508,4 +639,6 @@ public partial class MacroEditorWindow : Window
         _releaseOnly ? MacroTriggerMode.ReleaseOnce :
         Enum.TryParse<MacroTriggerMode>((TriggerModeBox.SelectedItem as ComboBoxItem)?.Tag?.ToString(), out var mode)
             ? mode : MacroTriggerMode.PressOnce;
+
+    private static int ParseTiming(string value, int fallback) => int.TryParse(value, out var parsed) ? parsed : fallback;
 }

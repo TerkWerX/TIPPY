@@ -24,11 +24,16 @@ public partial class MainWindow : Window
 
     private readonly ProfileStore _profileStore = new();
     private readonly PedalHidService _hid = new();
+    private readonly RawInputService _rawInput = new();
     private readonly VirtualGamepadService _gamepad = new();
     private readonly MacroPlayer _macroPlayer;
     private readonly GlobalHotkeyService _hotkey = new();
+    private readonly GlobalHotkeyService _emergencyHotkey = new();
     private readonly ForegroundApplicationService _foregroundApplications = new();
     private readonly PedalBankResolver _bankResolver = new();
+    private readonly PedalGestureEngine _gestureEngine = new();
+    private readonly PedalPatternEngine _patternEngine = new();
+    private readonly PedalActivityHub _pedalActivity = new();
     private readonly PedalRegistryService _pedalRegistry = new();
     private readonly Dictionary<string, PedalDeviceInfo> _connected = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<(string DeviceKey, int SwitchIndex), Border> _switchTiles = new();
@@ -36,8 +41,6 @@ public partial class MainWindow : Window
     private readonly HashSet<(string DeviceKey, int SwitchIndex)> _pressedSwitches = [];
     private readonly HashSet<string> _artworkPickerQueued = new(StringComparer.OrdinalIgnoreCase);
     private readonly Queue<(PedalDeviceProfile Profile, PedalDeviceInfo Info)> _pendingArtworkPickers = new();
-    private readonly Dictionary<(string DeviceKey, int SwitchIndex), MacroDefinition> _activeHeldMacros = new();
-    private readonly Dictionary<(string DeviceKey, int SwitchIndex), MacroDefinition> _pendingReleaseMacros = new();
     private readonly List<Button> _bankButtons = [];
     private readonly object _inputStateGate = new();
     private AppProfile _profile = new();
@@ -56,20 +59,26 @@ public partial class MainWindow : Window
     private bool _trayTipShown;
     private string? _activeApplicationProfileId;
     private bool _artworkPickerOpen;
+    private PedalDiagnosticsWindow? _diagnosticsWindow;
+    private StatusOverlayWindow? _overlayWindow;
+    private bool _rehearsalMode;
 
     public MainWindow()
     {
         InitializeComponent();
         InitializeTrayIcon();
         _macroPlayer = new MacroPlayer(new WindowsInputService(), _gamepad);
+        _gestureEngine.Invoked += GestureEngine_Invoked;
         Loaded += MainWindow_Loaded;
         Closed += MainWindow_Closed;
         SizeChanged += MainWindow_SizeChanged;
-        SourceInitialized += (_, _) => RegisterBankHotkey();
+        SourceInitialized += (_, _) => InitializePlatformInput();
         _hid.ConnectionChanged += Hid_ConnectionChanged;
         _hid.StateChanged += Hid_StateChanged;
         _hid.ScanCompleted += Hid_ScanCompleted;
         _hid.Diagnostic += (_, message) => Dispatcher.Invoke(() => SetStatus(message));
+        _rawInput.KeyChanged += RawInput_KeyChanged;
+        _rawInput.DevicesChanged += (_, _) => Dispatcher.BeginInvoke(new Action(SyncRawInputDevices));
         _macroPlayer.PlaybackError += (_, error) => Dispatcher.Invoke(() => SetStatus(error, true));
         SystemEvents.SessionSwitch += SystemEvents_SessionSwitch;
         SystemEvents.PowerModeChanged += SystemEvents_PowerModeChanged;
@@ -89,15 +98,20 @@ public partial class MainWindow : Window
         }
 
         _profile.Normalize();
+        _macroPlayer.ConfigureSafety(_profile.Safety);
+        _gestureEngine.ConfigureMaximumRepeatDuration(TimeSpan.FromSeconds(_profile.Safety.MaximumRepeatSeconds));
+        _patternEngine.Configure(_profile.PedalPatterns);
         _pedalRegistry.Reload();
         ThemeService.Apply(_profile.Theme);
         SetLayoutSelector();
         _loaded = true;
+        ScheduleSave();
         BuildBankButtons();
         RefreshDevices();
         UpdateHeader();
-        RegisterBankHotkey();
+        RegisterHotkeys();
         _hid.ConfigureLearnedDevices(_profile.LearnedPedals);
+        SyncRawInputDevices();
         _hid.Start();
         SetStatus("Listening for USB foot controls");
         if (_profile.StartMinimized)
@@ -149,6 +163,7 @@ public partial class MainWindow : Window
                 _connected.Remove(e.Device.DeviceKey);
             }
             RefreshDevices(true);
+            _diagnosticsWindow?.SetDevices(_connected.Values.ToArray());
             SetStatus($"{_connected.Count} foot control{(_connected.Count == 1 ? string.Empty : "s")} connected");
         });
     }
@@ -174,6 +189,7 @@ public partial class MainWindow : Window
         Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Send, new Action(() =>
         {
             if (_inputSuspended) return;
+            _diagnosticsWindow?.Record(e, System.Diagnostics.Stopwatch.GetTimestamp());
             var triggerId = $"{e.Device.DeviceKey}:{e.SwitchIndex}";
             var key = (e.Device.DeviceKey, e.SwitchIndex);
             ApplicationProfileRule? applicationProfile = null;
@@ -190,18 +206,9 @@ public partial class MainWindow : Window
 
             if (!e.IsPressed)
             {
+                _patternEngine.Release(triggerId);
+                _gestureEngine.Release(triggerId, e.IsSynthetic);
                 var releasedShift = _bankResolver.ReleaseShift(e.Device.DeviceKey, e.SwitchIndex);
-                if (_activeHeldMacros.Remove(key, out _))
-                {
-                    _macroPlayer.ReleaseHeld(triggerId);
-                }
-                if (_pendingReleaseMacros.Remove(key, out var releaseMacro))
-                {
-                    if (!e.IsSynthetic)
-                    {
-                        _macroPlayer.Handle(triggerId, releaseMacro, false);
-                    }
-                }
                 if (releasedShift)
                 {
                     RefreshDevices();
@@ -223,40 +230,87 @@ public partial class MainWindow : Window
             }
             var bankIndex = _bankResolver.Resolve(device, applicationProfile);
             var binding = device.Banks[bankIndex].Bindings[e.SwitchIndex];
+            _pedalActivity.Publish(device.DeviceKey, device.DisplayName, e.SwitchIndex);
+            foreach (var pattern in _patternEngine.Press(triggerId, System.Diagnostics.Stopwatch.GetTimestamp()))
+            {
+                var patternMacro = PrepareMacro(pattern.Macro, device, e.SwitchIndex, bankIndex, applicationProfile);
+                if (!_rehearsalMode) _macroPlayer.Handle($"pattern:{pattern.PatternId}", patternMacro, true);
+                SetStatus($"{(_rehearsalMode ? "Rehearsal · would run" : "Foot pattern")} · {pattern.Name}");
+                ShowOverlay(pattern.Name, $"Foot {pattern.Type.ToString().ToLowerInvariant()} · {device.DisplayName}");
+            }
             switch (binding.Type)
             {
                 case PedalBindingType.BankNext:
-                    SwitchPedalBank(device, (device.ActiveBankIndex + 1) % AppProfile.MaxBanks);
+                    if (_rehearsalMode)
+                    {
+                        SetStatus($"Rehearsal · would switch {device.DisplayName} to the next bank");
+                        ShowOverlay("Next bank", $"Would switch · {device.DisplayName}");
+                    }
+                    else SwitchPedalBank(device, (device.ActiveBankIndex + 1) % AppProfile.MaxBanks);
                     break;
                 case PedalBindingType.ShiftLayer:
+                    if (_rehearsalMode)
+                    {
+                        SetStatus($"Rehearsal · would hold Bank {binding.ShiftBankIndex + 1} on {device.DisplayName}");
+                        ShowOverlay($"Shift Bank {binding.ShiftBankIndex + 1}", $"Would hold · {device.DisplayName}");
+                        break;
+                    }
                     _bankResolver.ActivateShift(device.DeviceKey, e.SwitchIndex, binding.ShiftBankIndex);
                     RefreshDevices();
                     UpdatePressedVisual(key, true);
                     SetStatus($"{device.DisplayName} · momentary Bank {binding.ShiftBankIndex + 1} active while held");
                     break;
                 case PedalBindingType.Macro:
-                    if (binding.ReleaseMacro.Steps.Count > 0)
-                    {
-                        _pendingReleaseMacros[key] = binding.ReleaseMacro.Clone();
-                    }
-                    var macro = binding.Macro.Clone();
-                    if (macro.Steps.Count > 0)
-                    {
-                        if (macro.TriggerMode == MacroTriggerMode.WhileHeld)
-                        {
-                            _activeHeldMacros[key] = macro;
-                        }
-                        else if (macro.TriggerMode == MacroTriggerMode.ReleaseOnce)
-                        {
-                            _pendingReleaseMacros[key] = macro;
-                        }
-                        _macroPlayer.Handle(triggerId, macro, true);
-                    }
+                    _gestureEngine.Press(triggerId,
+                        PrepareBinding(binding, device, e.SwitchIndex, bankIndex, applicationProfile));
                     var context = applicationProfile is null ? string.Empty : $" · {applicationProfile.Name}";
                     SetStatus($"{e.Device.DisplayName} · Bank {bankIndex + 1}{context} · Pedal {e.SwitchIndex + 1} · {binding.DisplayName}");
                     break;
             }
         }));
+    }
+
+    private void GestureEngine_Invoked(object? sender, PedalGestureInvocation invocation)
+    {
+        if (Dispatcher.HasShutdownStarted) return;
+        Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Send, new Action(() =>
+        {
+            if (_inputSuspended) return;
+            if (!_rehearsalMode) _macroPlayer.Handle(invocation.TriggerId, invocation.Macro, invocation.IsPressed);
+            if (!invocation.Gesture.StartsWith("Release held", StringComparison.OrdinalIgnoreCase))
+                SetStatus($"{(_rehearsalMode ? "Rehearsal · would run" : invocation.Gesture)} · {invocation.Macro.Name}");
+            ShowOverlay(invocation.Macro.Name, _rehearsalMode ? $"Would run · {invocation.Gesture}" : invocation.Gesture);
+        }));
+    }
+
+    private PedalBinding PrepareBinding(
+        PedalBinding source,
+        PedalDeviceProfile device,
+        int switchIndex,
+        int bankIndex,
+        ApplicationProfileRule? applicationProfile)
+    {
+        var result = source.Clone();
+        result.Macro = PrepareMacro(result.Macro, device, switchIndex, bankIndex, applicationProfile);
+        result.ReleaseMacro = PrepareMacro(result.ReleaseMacro, device, switchIndex, bankIndex, applicationProfile);
+        result.Gestures.DoubleTapMacro = PrepareMacro(result.Gestures.DoubleTapMacro, device, switchIndex, bankIndex, applicationProfile);
+        result.Gestures.LongPressMacro = PrepareMacro(result.Gestures.LongPressMacro, device, switchIndex, bankIndex, applicationProfile);
+        return result;
+    }
+
+    private MacroDefinition PrepareMacro(
+        MacroDefinition source,
+        PedalDeviceProfile device,
+        int switchIndex,
+        int bankIndex,
+        ApplicationProfileRule? applicationProfile)
+    {
+        var foreground = applicationProfile?.Name ?? _foregroundApplications.GetCurrent()?.ProcessName ?? string.Empty;
+        var clipboard = string.Empty;
+        try { if (Clipboard.ContainsText()) clipboard = Clipboard.GetText(); } catch { }
+        return MacroVariableExpander.Expand(source, new MacroVariableContext(
+            _profile.Name, device.DisplayName, switchIndex + 1, bankIndex + 1, foreground, clipboard),
+            _profile.Variables);
     }
 
     private void UpdatePressedVisual((string DeviceKey, int SwitchIndex) key, bool isPressed)
@@ -299,6 +353,8 @@ public partial class MainWindow : Window
         _activeApplicationProfileId = id;
         RefreshDevices();
         UpdateHeader();
+        ShowOverlay(profile?.Name ?? "Default banks",
+            profile is null ? "No foreground application profile" : "Foreground application profile active");
     }
 
     private ApplicationProfileRule? GetActiveApplicationProfile() =>
@@ -313,21 +369,15 @@ public partial class MainWindow : Window
     private void ReleaseActionsForDevice(string deviceKey)
     {
         _bankResolver.ReleaseDevice(deviceKey);
-        _pressedSwitches.RemoveWhere(key =>
-            key.DeviceKey.Equals(deviceKey, StringComparison.OrdinalIgnoreCase));
-        foreach (var key in _activeHeldMacros.Keys
-                     .Where(key => key.DeviceKey.Equals(deviceKey, StringComparison.OrdinalIgnoreCase))
-                     .ToArray())
+        foreach (var key in _pressedSwitches
+                     .Where(key => key.DeviceKey.Equals(deviceKey, StringComparison.OrdinalIgnoreCase)).ToArray())
         {
-            _activeHeldMacros.Remove(key);
-            _macroPlayer.ReleaseHeld($"{key.DeviceKey}:{key.SwitchIndex}");
+            var triggerId = $"{key.DeviceKey}:{key.SwitchIndex}";
+            _gestureEngine.Cancel(triggerId);
+            _macroPlayer.ReleaseHeld(triggerId);
+            _patternEngine.Release(triggerId);
         }
-        foreach (var key in _pendingReleaseMacros.Keys
-                     .Where(key => key.DeviceKey.Equals(deviceKey, StringComparison.OrdinalIgnoreCase))
-                     .ToArray())
-        {
-            _pendingReleaseMacros.Remove(key);
-        }
+        _pressedSwitches.RemoveWhere(key => key.DeviceKey.Equals(deviceKey, StringComparison.OrdinalIgnoreCase));
     }
 
     private void BuildBankButtons()
@@ -358,6 +408,7 @@ public partial class MainWindow : Window
         RefreshDevices();
         ScheduleSave();
         SetStatus($"Bank {bankIndex + 1} active on all pedals");
+        ShowOverlay($"Bank {bankIndex + 1}", "All pedals");
     }
 
     private void SwitchPedalBank(PedalDeviceProfile device, int bankIndex)
@@ -367,6 +418,7 @@ public partial class MainWindow : Window
         RefreshDevices();
         ScheduleSave();
         SetStatus($"{device.DisplayName} · Bank {device.ActiveBankIndex + 1} active");
+        ShowOverlay($"Bank {device.ActiveBankIndex + 1}", device.DisplayName);
     }
 
     private void UpdateBankButtons()
@@ -1057,7 +1109,11 @@ public partial class MainWindow : Window
             ThemeService.Apply(_profile.Theme);
             SetLayoutSelector();
             _hid.ConfigureLearnedDevices(_profile.LearnedPedals);
-            BuildBankButtons(); RefreshDevices(); UpdateHeader(); RegisterBankHotkey();
+            SyncRawInputDevices();
+            _macroPlayer.ConfigureSafety(_profile.Safety);
+            _gestureEngine.ConfigureMaximumRepeatDuration(TimeSpan.FromSeconds(_profile.Safety.MaximumRepeatSeconds));
+            _patternEngine.Configure(_profile.PedalPatterns);
+            BuildBankButtons(); RefreshDevices(); UpdateHeader(); RegisterHotkeys();
             await _hid.ScanAsync();
             await _profileStore.SaveDefaultAsync(_profile);
             SetStatus($"Loaded {System.IO.Path.GetFileName(dialog.FileName)}");
@@ -1089,12 +1145,18 @@ public partial class MainWindow : Window
 
     private void Settings_Click(object sender, RoutedEventArgs e)
     {
-        var settings = new SettingsWindow(_profile.BankHotkey, _profile.StartMinimized, _gamepad) { Owner = this };
+        var settings = new SettingsWindow(_profile.BankHotkey, _profile.StartMinimized, _gamepad,
+            _profile.Safety, _profile.Overlay, _profile.Variables) { Owner = this };
         if (settings.ShowDialog() == true)
         {
             _profile.BankHotkey = settings.BankHotkey;
             _profile.StartMinimized = settings.StartMinimized;
-            RegisterBankHotkey(); UpdateHeader(); ScheduleSave();
+            _profile.Safety = settings.Safety;
+            _profile.Overlay = settings.Overlay;
+            _profile.Variables = settings.Variables.ToList();
+            _macroPlayer.ConfigureSafety(_profile.Safety);
+            _gestureEngine.ConfigureMaximumRepeatDuration(TimeSpan.FromSeconds(_profile.Safety.MaximumRepeatSeconds));
+            RegisterHotkeys(); UpdateHeader(); ScheduleSave();
         }
     }
 
@@ -1112,6 +1174,187 @@ public partial class MainWindow : Window
         UpdateHeader();
         ScheduleSave();
         SetStatus($"Saved {_profile.ApplicationProfiles.Count} foreground application profile{(_profile.ApplicationProfiles.Count == 1 ? string.Empty : "s")}");
+    }
+
+    private void Tools_Click(object sender, RoutedEventArgs e)
+    {
+        var menu = new ContextMenu();
+        menu.Items.Add(CreateToolsItem("Foot combinations & sequences", OpenFootPatterns));
+        menu.Items.Add(CreateToolsItem("Live pedal diagnostics", OpenDiagnostics));
+        var rehearsal = new MenuItem { Header = "Rehearsal mode — preview without output", IsCheckable = true, IsChecked = _rehearsalMode };
+        rehearsal.Click += (_, _) => SetRehearsalMode(rehearsal.IsChecked);
+        menu.Items.Add(rehearsal);
+        menu.Items.Add(new Separator());
+        menu.Items.Add(CreateToolsItem("Profile backups & portable mode", OpenStorageTools));
+        menu.Items.Add(CreateToolsItem("Install pedal support pack", InstallPedalSupportPack));
+        menu.Items.Add(CreateToolsItem("Learn keyboard-style pedal", LearnRawInputPedal));
+        menu.PlacementTarget = sender as UIElement;
+        menu.IsOpen = true;
+    }
+
+    private static MenuItem CreateToolsItem(string header, Action action)
+    {
+        var item = new MenuItem { Header = header };
+        item.Click += (_, _) => action();
+        return item;
+    }
+
+    private void OpenFootPatterns()
+    {
+        var wasRehearsing = _rehearsalMode;
+        if (!wasRehearsing) SetRehearsalMode(true);
+        var editor = new FootPatternsWindow(_profile.PedalPatterns, _profile.Devices, _pedalActivity) { Owner = this };
+        bool accepted;
+        try { accepted = editor.ShowDialog() == true; }
+        finally { if (!wasRehearsing) SetRehearsalMode(false); }
+        if (!accepted) return;
+        _profile.PedalPatterns = editor.Result.Select(pattern => pattern.Clone()).ToList();
+        _patternEngine.Configure(_profile.PedalPatterns);
+        ScheduleSave();
+        SetStatus($"Saved {_profile.PedalPatterns.Count} foot pattern{(_profile.PedalPatterns.Count == 1 ? string.Empty : "s")}");
+    }
+
+    private void OpenDiagnostics()
+    {
+        if (_diagnosticsWindow is { IsLoaded: true })
+        {
+            _diagnosticsWindow.Activate();
+            return;
+        }
+        _diagnosticsWindow = new PedalDiagnosticsWindow { Owner = this };
+        _diagnosticsWindow.SetDevices(_connected.Values.ToArray());
+        _diagnosticsWindow.Closed += (_, _) => _diagnosticsWindow = null;
+        _diagnosticsWindow.Show();
+    }
+
+    private void ShowOverlay(string title, string context)
+    {
+        if (!_profile.Overlay.Enabled) return;
+        _overlayWindow ??= new StatusOverlayWindow();
+        _overlayWindow.ShowStatus(title, context, _profile.Overlay);
+    }
+
+    private void SetRehearsalMode(bool enabled)
+    {
+        if (_rehearsalMode == enabled) return;
+        _macroPlayer.ReleaseAll();
+        _gestureEngine.ReleaseAll();
+        _rehearsalMode = enabled;
+        SetStatus(enabled
+            ? "Rehearsal mode active · pedal actions are previewed but not sent"
+            : "Rehearsal mode ended · pedal output restored");
+        ShowOverlay(enabled ? "Rehearsal mode" : "Live output", enabled ? "No keyboard, mouse, MIDI, OSC, or gamepad output" : "Pedal actions are active");
+    }
+
+    private void OpenStorageTools()
+    {
+        var tools = new StorageToolsWindow(_profileStore, _profile) { Owner = this };
+        if (tools.ShowDialog() != true || tools.RestoredProfile is null) return;
+        ReleaseAllInputs();
+        _profile = tools.RestoredProfile;
+        _profile.Normalize();
+        _activeApplicationProfileId = null;
+        _bankResolver.Clear();
+        _macroPlayer.ConfigureSafety(_profile.Safety);
+        _gestureEngine.ConfigureMaximumRepeatDuration(TimeSpan.FromSeconds(_profile.Safety.MaximumRepeatSeconds));
+        _patternEngine.Configure(_profile.PedalPatterns);
+        ThemeService.Apply(_profile.Theme);
+        SetLayoutSelector();
+        _hid.ConfigureLearnedDevices(_profile.LearnedPedals);
+        SyncRawInputDevices();
+        BuildBankButtons();
+        RefreshDevices();
+        UpdateHeader();
+        RegisterHotkeys();
+        SetStatus("Restored profile backup");
+    }
+
+    private async void InstallPedalSupportPack()
+    {
+        var dialog = new OpenFileDialog
+        {
+            Title = "Install checksum-verified Tippy pedal support pack",
+            Filter = "Tippy pedal packs (*.tippy-pedal-pack.zip)|*.tippy-pedal-pack.zip|ZIP archives (*.zip)|*.zip"
+        };
+        if (dialog.ShowDialog(this) != true) return;
+        try
+        {
+            var result = await new DeviceSupportPackService().InstallAsync(dialog.FileName);
+            _pedalRegistry.Reload();
+            RefreshDevices();
+            SetStatus($"Installed pedal pack {result.PackId} {result.Version} · {result.FileCount} verified files");
+        }
+        catch (Exception exception)
+        {
+            MessageBox.Show(this, exception.Message, "Pedal support pack", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+    }
+
+    private void LearnRawInputPedal()
+    {
+        var wasRehearsing = _rehearsalMode;
+        if (!wasRehearsing) SetRehearsalMode(true);
+        var learner = new RawInputLearnWindow(_rawInput) { Owner = this };
+        bool accepted;
+        try { accepted = learner.ShowDialog() == true && learner.Result is not null; }
+        finally { if (!wasRehearsing) SetRehearsalMode(false); }
+        if (!accepted || learner.Result is null) return;
+        _profile.RawInputPedals.RemoveAll(definition =>
+            definition.DevicePath.Equals(learner.Result.DevicePath, StringComparison.OrdinalIgnoreCase));
+        _profile.RawInputPedals.Add(learner.Result);
+        SyncRawInputDevices();
+        ScheduleSave();
+        SetStatus($"Learned keyboard-style pedal · {learner.Result.DisplayName}");
+    }
+
+    private void InitializePlatformInput()
+    {
+        RegisterHotkeys();
+        try { _rawInput.Initialize(this); }
+        catch (Exception exception) { SetStatus($"Raw Input unavailable: {exception.Message}", true); }
+    }
+
+    private void SyncRawInputDevices()
+    {
+        if (!_loaded) return;
+        var active = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var definition in _profile.RawInputPedals)
+        {
+            if (!_rawInput.Devices.Any(device =>
+                    device.DevicePath.Equals(definition.DevicePath, StringComparison.OrdinalIgnoreCase))) continue;
+            var info = CreateRawInputInfo(definition);
+            active.Add(info.DeviceKey);
+            if (!_connected.ContainsKey(info.DeviceKey))
+                Hid_ConnectionChanged(this, new PedalConnectionEventArgs(info, true));
+        }
+        foreach (var info in _connected.Values.Where(info => info.DecoderName == "Windows Raw Input" &&
+                     !active.Contains(info.DeviceKey)).ToArray())
+            Hid_ConnectionChanged(this, new PedalConnectionEventArgs(info, false));
+    }
+
+    private void RawInput_KeyChanged(object? sender, RawInputKeyEvent e)
+    {
+        var definition = _profile.RawInputPedals.FirstOrDefault(item =>
+            item.DevicePath.Equals(e.DevicePath, StringComparison.OrdinalIgnoreCase));
+        var mapping = definition?.Switches.FirstOrDefault(item => item.VirtualKey == e.VirtualKey);
+        if (definition is null || mapping is null) return;
+        var info = CreateRawInputInfo(definition);
+        Hid_StateChanged(this, new PedalStateEventArgs(info, mapping.SwitchIndex, e.IsPressed,
+            BitConverter.GetBytes(e.VirtualKey), false, e.Timestamp));
+    }
+
+    private static PedalDeviceInfo CreateRawInputInfo(RawInputPedalDefinition definition)
+    {
+        var hash = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(
+            System.Text.Encoding.UTF8.GetBytes(definition.DevicePath)))[..12];
+        var vidMatch = System.Text.RegularExpressions.Regex.Match(definition.DevicePath, "VID_([0-9A-F]{4})",
+            System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+        var pidMatch = System.Text.RegularExpressions.Regex.Match(definition.DevicePath, "PID_([0-9A-F]{4})",
+            System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+        var vid = vidMatch.Success ? Convert.ToInt32(vidMatch.Groups[1].Value, 16) : 0;
+        var pid = pidMatch.Success ? Convert.ToInt32(pidMatch.Groups[1].Value, 16) : 0;
+        return new PedalDeviceInfo($"RAW:{hash}", definition.DisplayName, vid, pid,
+            definition.DevicePath, "Windows Raw Input", Math.Max(1, definition.Switches.Count));
     }
 
     private void Help_Click(object sender, RoutedEventArgs e)
@@ -1144,7 +1387,7 @@ public partial class MainWindow : Window
     private void ReleaseAllInputs()
     {
         _macroPlayer.ReleaseAll();
-        ClearTrackedActions("Released all Tippy-held keyboard and gamepad inputs");
+        ClearTrackedActions("Stopped Tippy output and released all held keyboard, mouse, and gamepad inputs");
     }
 
     private void SystemEvents_SessionSwitch(object sender, SessionSwitchEventArgs e)
@@ -1195,6 +1438,8 @@ public partial class MainWindow : Window
             _inputSuspended = true;
             generation = ++_inputStateGeneration;
             _macroPlayer.Suspend();
+            _gestureEngine.ReleaseAll();
+            _patternEngine.Clear();
             _bankResolver.Clear();
         }
         QueueSuspendedUiUpdate(generation);
@@ -1228,8 +1473,8 @@ public partial class MainWindow : Window
                 _macroPlayer.Resume();
                 _inputSuspended = false;
             }
-            _activeHeldMacros.Clear();
-            _pendingReleaseMacros.Clear();
+            _gestureEngine.ReleaseAll();
+            _patternEngine.Clear();
             _pressedSwitches.Clear();
             RefreshDevices();
             _ = _hid.ScanAsync();
@@ -1262,8 +1507,8 @@ public partial class MainWindow : Window
 
     private void ClearTrackedActions(string status)
     {
-        _activeHeldMacros.Clear();
-        _pendingReleaseMacros.Clear();
+        _gestureEngine.ReleaseAll();
+        _patternEngine.Clear();
         _bankResolver.Clear();
         SetStatus(status);
         if (_loaded) RefreshDevices();
@@ -1497,6 +1742,15 @@ public partial class MainWindow : Window
         }
     }
 
+    private void RegisterHotkeys()
+    {
+        RegisterBankHotkey();
+        if (!_loaded || new System.Windows.Interop.WindowInteropHelper(this).Handle == IntPtr.Zero) return;
+        if (!_emergencyHotkey.Register(this, _profile.Safety.EmergencyStopHotkey,
+                () => Dispatcher.Invoke(ReleaseAllInputs), out var error))
+            SetStatus(error ?? "Could not register emergency-stop hotkey", true);
+    }
+
     private void UpdateHeader()
     {
         ThemeButton.Content = _profile.Theme == AppTheme.Dark ? "Light mode" : "Dark mode";
@@ -1546,7 +1800,8 @@ public partial class MainWindow : Window
             _trayIcon.Dispose();
             _trayIcon = null;
         }
-        _hotkey.Dispose(); _hid.Dispose(); _macroPlayer.Dispose(); _gamepad.Dispose(); _saveDebounce?.Dispose();
+        _overlayWindow?.Close();
+        _hotkey.Dispose(); _emergencyHotkey.Dispose(); _rawInput.Dispose(); _gestureEngine.Dispose(); _hid.Dispose(); _macroPlayer.Dispose(); _gamepad.Dispose(); _saveDebounce?.Dispose();
     }
 
     private static string ShortDeviceKey(string key) => key.Length <= 12 ? key : key[^12..];

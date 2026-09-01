@@ -64,7 +64,7 @@ public sealed class ProfileTests
 
         var loaded = new ProfileSerializer().Deserialize(json);
 
-        Assert.Equal(5, loaded.SchemaVersion);
+        Assert.Equal(6, loaded.SchemaVersion);
         Assert.All(loaded.Devices, device => Assert.Equal(2, device.ActiveBankIndex));
     }
 
@@ -153,7 +153,7 @@ public sealed class ProfileTests
         var serializer = new ProfileSerializer();
         var loaded = serializer.Deserialize(serializer.Serialize(profile));
 
-        Assert.Equal(5, loaded.SchemaVersion);
+        Assert.Equal(6, loaded.SchemaVersion);
         var learned = Assert.Single(loaded.LearnedPedals);
         Assert.Equal("Custom pedal", learned.Name);
         Assert.Equal(3, learned.Switches.Count);
@@ -242,5 +242,68 @@ public sealed class ProfileTests
         Assert.False(rule.Matches("blender", @"C:\Blender\blender.exe"));
         Assert.Equal(2, rule.GetBankIndex("left", 0));
         Assert.Equal(1, rule.GetBankIndex("right", 1));
+    }
+
+    [Fact]
+    public void AdvancedInteractionAndSafetySettingsRoundTrip()
+    {
+        var profile = new AppProfile
+        {
+            Variables = [new TippyVariable { Name = "project", Value = "Tippy" }],
+            Safety = new MacroSafetySettings
+            {
+                MaximumMacroSeconds = 45, MaximumRepeatSeconds = 12, MaximumSteps = 800,
+                EmergencyStopHotkey = "Ctrl+Shift+Escape"
+            },
+            Overlay = new OverlaySettings { Enabled = true, VisibleSeconds = 5, Left = 100, Top = 200 },
+            RawInputPedals =
+            [
+                new RawInputPedalDefinition
+                {
+                    DevicePath = @"\\?\HID#VID_1234&PID_5678",
+                    DisplayName = "Keyboard pedal",
+                    Switches = [new RawInputSwitchMapping { VirtualKey = 0x70, SwitchIndex = 0 }]
+                }
+            ],
+            PedalPatterns =
+            [
+                new PedalPatternDefinition
+                {
+                    Name = "Chord",
+                    Type = PedalPatternType.Combination,
+                    Triggers =
+                    [
+                        new PedalTriggerReference { DeviceKey = "left", SwitchIndex = 0 },
+                        new PedalTriggerReference { DeviceKey = "right", SwitchIndex = 2 }
+                    ],
+                    Macro = new MacroDefinition
+                    {
+                        Name = "OSC scene",
+                        Steps = [new MacroStep { Type = MacroStepType.Osc, Value = "/scene", Arguments = "2", Amount = 8000 }]
+                    }
+                }
+            ]
+        };
+        var device = PedalDeviceProfile.Create("left", "Left", 1, 2);
+        device.Banks[0].Bindings[0].Gestures.DoubleTapMacro = new MacroDefinition
+        {
+            Name = "Double",
+            Steps = [new MacroStep { Type = MacroStepType.Midi, Value = "note:1:60:127" }]
+        };
+        device.Banks[0].Bindings[0].Gestures.Toggle = true;
+        profile.Devices.Add(device);
+
+        var serializer = new ProfileSerializer();
+        var loaded = serializer.Deserialize(serializer.Serialize(profile));
+
+        Assert.Equal(6, loaded.SchemaVersion);
+        Assert.Equal("Tippy", Assert.Single(loaded.Variables).Value);
+        Assert.Equal(45, loaded.Safety.MaximumMacroSeconds);
+        Assert.True(loaded.Overlay.Enabled);
+        Assert.Equal(0x70, Assert.Single(Assert.Single(loaded.RawInputPedals).Switches).VirtualKey);
+        Assert.Equal(PedalPatternType.Combination, Assert.Single(loaded.PedalPatterns).Type);
+        Assert.True(loaded.Devices[0].Banks[0].Bindings[0].Gestures.Toggle);
+        Assert.Equal(MacroStepType.Midi,
+            Assert.Single(loaded.Devices[0].Banks[0].Bindings[0].Gestures.DoubleTapMacro.Steps).Type);
     }
 }

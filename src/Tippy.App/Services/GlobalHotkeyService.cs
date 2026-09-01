@@ -7,7 +7,8 @@ namespace Tippy.App.Services;
 
 public sealed class GlobalHotkeyService : IDisposable
 {
-    private const int HotkeyId = 0x54A1;
+    private static int _nextHotkeyId = 0x54A0;
+    private readonly int _hotkeyId = Interlocked.Increment(ref _nextHotkeyId);
     private const int WmHotkey = 0x0312;
     private const uint ModAlt = 0x0001;
     private const uint ModControl = 0x0002;
@@ -45,7 +46,7 @@ public sealed class GlobalHotkeyService : IDisposable
             _handle = new WindowInteropHelper(owner).Handle;
             _source = HwndSource.FromHwnd(_handle);
             _source?.AddHook(WindowHook);
-            if (!RegisterHotKey(_handle, HotkeyId, modifiers, virtualKey))
+            if (!RegisterHotKey(_handle, _hotkeyId, modifiers, virtualKey))
             {
                 throw new InvalidOperationException($"{shortcut} is already reserved by another application.");
             }
@@ -62,7 +63,7 @@ public sealed class GlobalHotkeyService : IDisposable
 
     private IntPtr WindowHook(IntPtr hwnd, int message, IntPtr wParam, IntPtr lParam, ref bool handled)
     {
-        if (message == WmHotkey && wParam.ToInt32() == HotkeyId)
+        if (message == WmHotkey && wParam.ToInt32() == _hotkeyId)
         {
             handled = true;
             _callback?.Invoke();
@@ -74,7 +75,7 @@ public sealed class GlobalHotkeyService : IDisposable
     {
         if (_handle != IntPtr.Zero)
         {
-            UnregisterHotKey(_handle, HotkeyId);
+            UnregisterHotKey(_handle, _hotkeyId);
         }
         _source?.RemoveHook(WindowHook);
         _source = null;
