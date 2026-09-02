@@ -1,11 +1,15 @@
 {
-  "registry_version": "1.0",
-  "generated": "2026-09-01",
+  "registry_version": "1.2",
+  "generated": "2026-09-02",
   "image_spec": {
     "directory": "pedals/",
-    "canvas_px": [1370, 880],
+    "canvas_px": [
+      1370,
+      880
+    ],
     "format": "PNG, transparent background, USB cable removed, straight top-down, pedal centered and scaled to fill",
-    "display_rule": "Render as-is. Never stretch or change aspect ratio; letterbox inside UI slots."
+    "display_rule": "Render as-is. Never stretch or change aspect ratio; letterbox inside UI slots.",
+    "view_field": "Optional per-device 'view': 'top-down' (default), 'top-down (rectified)', 'front-elevated' or '3/4'. Non-top-down assets are placeholders flagged for a true top-down replacement."
   },
   "match_strategy": {
     "primary": "USB VID:PID (hex) on HID enumeration / hotplug",
@@ -17,161 +21,299 @@
       "id": "olympus-rs31",
       "image": "olympus_rs-31h.png",
       "brand": "Olympus (OM System)",
-      "models": ["RS-31H", "RS-31"],
+      "models": [
+        "RS-31H",
+        "RS-31"
+      ],
       "pedal_count": 4,
       "vid": "07B4",
       "pid": null,
       "id_confidence": "vendor confirmed (Olympus 07B4); PID unverified - log at runtime",
-      "notes": "OLYMPUS molded center; RS-31H adds HID keyboard mode."
+      "notes": "OLYMPUS molded center; RS-31H adds HID keyboard mode.",
+      "view": "top-down"
     },
     {
       "id": "olympus-rs27",
       "image": "olympus_rs-27h.png",
       "brand": "Olympus (OM System)",
-      "models": ["RS-27H", "RS-27"],
+      "models": [
+        "RS-27H",
+        "RS-27"
+      ],
       "pedal_count": 3,
       "vid": "07B4",
       "pid": null,
       "id_confidence": "vendor confirmed; PID unverified - log at runtime",
-      "notes": "OLYMPUS molded into rear bar."
+      "notes": "OLYMPUS molded into rear bar.",
+      "view": "top-down"
     },
     {
       "id": "olympus-rs26",
       "image": "olympus_rs-26.png",
       "brand": "Olympus",
-      "models": ["RS-26"],
+      "models": [
+        "RS-26"
+      ],
       "pedal_count": 3,
       "vid": "07B4",
       "pid": "0202",
       "id_confidence": "CONFIRMED (usb.ids: 'Foot Switch RS-26')",
-      "notes": "No brand on top (molded REW/FF/LISTEN). Image is perspective-rectified; slightly soft; will be replaced when better source found."
+      "notes": "Shares the RS-28H shell asset (identical housing). NOTE: a real RS-26 has no OLYMPUS logo on the rear-left pad (molded REW/FF/LISTEN only) while this shared image shows the RS-28H logo. Previous rectified hobbyist-photo asset was superseded 2026-09-02.",
+      "view": "top-down (mild keystone corrected)",
+      "image_added": "2026-09-02"
     },
     {
       "id": "olympus-rs28",
-      "image": null,
+      "image": "olympus_rs-28h.png",
       "brand": "Olympus (OM System)",
-      "models": ["RS-28H", "RS-28"],
+      "models": [
+        "RS-28H",
+        "RS-28"
+      ],
       "pedal_count": 3,
       "vid": "07B4",
       "pid": "0218",
       "id_confidence": "CONFIRMED (usb.ids: 'Foot Switch RS-28')",
-      "notes": "IMAGE WANTED - only 3/4 views exist so far. Show generic placeholder with model name until image lands in pedals/ (planned filename: olympus_rs-28h.png)."
+      "notes": "Cleaned from user-supplied olympus_rs-26-rs28h-clean.png (cable already removed); keystone corrected and height adjusted ~4% toward the 190x120 mm top-plane aspect. Front pedal faces faintly visible along the bottom edge.",
+      "view": "top-down (mild keystone corrected)",
+      "image_added": "2026-09-02"
     },
     {
       "id": "philips-acc23x0",
       "image": "philips_acc2330.png",
       "brand": "Philips",
-      "models": ["ACC2330", "ACC2320", "ACC2310"],
+      "models": [
+        "ACC2330",
+        "ACC2320",
+        "ACC2310"
+      ],
       "pedal_count": 4,
       "vid": "0911",
       "pid": null,
       "id_confidence": "vendor assumed (Philips Speech 0911); PIDs not in public DBs - log at runtime",
-      "notes": "One shell serves ACC2310/2320/2330 (2310's top bar is inactive trim). If product string distinguishes model, show same image with correct model label."
+      "notes": "One shell serves ACC2310/2320/2330 (2310's top bar is inactive trim). If product string distinguishes model, show same image with correct model label.",
+      "view": "top-down"
     },
     {
       "id": "philips-lfh23x0",
       "image": "philips_lfh2330.png",
       "brand": "Philips",
-      "models": ["LFH2330", "LFH2320", "LFH2310", "LFH2210"],
+      "models": [
+        "LFH2330",
+        "LFH2320",
+        "LFH2310",
+        "LFH2210"
+      ],
       "pedal_count": 4,
       "vid": "0911",
       "pid": null,
       "id_confidence": "vendor assumed; PIDs not public - log at runtime",
-      "notes": "Pre-ACC gray-era housing shared by whole LFH22xx/23xx family per Philips manual. Very common thrift find."
+      "notes": "Pre-ACC gray-era housing shared by whole LFH22xx/23xx family per Philips manual. Very common thrift find.",
+      "view": "top-down"
     },
     {
       "id": "vec-inusb-family",
       "image": "generic-shell_in-usb-1_fs-85usb.png",
       "brand": "VEC / Infinity / ECS / Sony (shared shell + shared PID)",
-      "models": ["Infinity IN-USB-1", "Infinity IN-USB-2", "Infinity IN-USB-3", "Sony FS-85USB", "ECS FS-85USB", "ECS FS-85USB-SO", "ECS FTR USB 1", "AltoEdge pedal", "X-keys XK-3 (VEC-built units)", "Start-Stop / WAVpedal bundled pedal"],
+      "models": [
+        "Infinity IN-USB-1",
+        "Infinity IN-USB-2",
+        "Infinity IN-USB-3",
+        "Sony FS-85USB",
+        "ECS FS-85USB",
+        "ECS FS-85USB-SO",
+        "ECS FTR USB 1",
+        "AltoEdge pedal",
+        "X-keys XK-3 (VEC-built units)",
+        "Start-Stop / WAVpedal bundled pedal"
+      ],
       "pedal_count": 3,
       "vid": "05F3",
       "pid": "00FF",
       "id_confidence": "CONFIRMED (usb.ids: 'VEC Footpedal') - BUT SHARED across the entire IN-USB family and rebadges",
       "ambiguous": true,
-      "notes": "05F3:00FF cannot distinguish IN-USB-1 vs IN-USB-2/3 vs brand rebadges. Default to this unbranded IN-USB-1 shell image, then let the user pick their exact pedal look from the IN-USB family (user has AltoEdge + Infinity IN-USB-2 images and generates more rebadge variants by logo swap); remember the choice per machine/port."
+      "notes": "05F3:00FF cannot distinguish IN-USB-1 vs IN-USB-2/3 vs brand rebadges. Default to this unbranded IN-USB-1 shell image, then let the user pick their exact pedal look from the IN-USB family (user has AltoEdge + Infinity IN-USB-2 images and generates more rebadge variants by logo swap); remember the choice per machine/port.",
+      "view": "top-down"
     },
     {
       "id": "vpedal-vp1",
       "image": "vpedal_vp-1.png",
       "brand": "vPedal",
-      "models": ["vP-1", "vP-1-001"],
+      "models": [
+        "vP-1",
+        "vP-1-001"
+      ],
       "pedal_count": 3,
       "vid": null,
       "pid": null,
       "id_confidence": "unverified - log at runtime; match on product string 'vPedal' if present",
-      "notes": "Flat platform + 2 side rails + rear rocker bar."
+      "notes": "Flat platform + 2 side rails + rear rocker bar.",
+      "view": "top-down"
     },
     {
       "id": "elgato-sd-pedal",
       "image": "elgato_stream-deck-pedal.png",
       "brand": "Elgato (Corsair)",
-      "models": ["Stream Deck Pedal", "10GBF9901"],
+      "models": [
+        "Stream Deck Pedal",
+        "10GBF9901"
+      ],
       "pedal_count": 3,
       "vid": "0FD9",
       "pid": "0086",
       "id_confidence": "vendor CONFIRMED (Elgato 0FD9); PID 0086 commonly reported but unverified - accept any 0FD9 with product string 'Stream Deck Pedal'",
-      "notes": "Requires Elgato software normally, but enumerates as its own HID device."
+      "notes": "Requires Elgato software normally, but enumerates as its own HID device.",
+      "view": "top-down"
     },
     {
       "id": "grundig-540",
-      "image": null,
+      "image": "grundig_digta-540.png",
       "brand": "Grundig Business Systems",
-      "models": ["Digta Foot Control 540 USB", "GD-540", "726004400", "GZT5400"],
+      "models": [
+        "Digta Foot Control 540 USB",
+        "GD-540",
+        "726004400",
+        "GZT5400"
+      ],
       "pedal_count": 3,
       "vid": null,
       "pid": null,
       "id_confidence": "unverified (Grundig VID possibly 15D8) - log at runtime",
-      "notes": "IMAGE WANTED - only 3/4 views exist. Planned filename: grundig_digta-540.png."
+      "notes": "Vendor front-elevated shot (~27 deg), cleaned and levelled, not stretched to the 201x117 mm footprint. ACCEPTED as-is by user 2026-09-02 (all three pedals visible and balanced, which is the purpose of the view rule). FFWD pedal rear edge touches the source frame (possible 1-3 px clip).",
+      "view": "front-elevated",
+      "image_added": "2026-09-02"
     },
     {
       "id": "kinesis-se2",
-      "image": null,
+      "image": "kinesis_savant-elite2.png",
       "brand": "Kinesis",
-      "models": ["Savant Elite2 FP30A", "FP30AJ", "FP20A dual", "FP10A single"],
+      "models": [
+        "Savant Elite2 FP30A",
+        "FP30AJ",
+        "FP20A dual",
+        "FP10A single"
+      ],
       "pedal_count": 3,
       "vid": null,
       "pid": null,
       "id_confidence": "unverified - log at runtime; product string contains 'Savant Elite2'",
-      "notes": "IMAGE WANTED - only 3/4 views exist. Planned filename: kinesis_savant-elite2.png."
+      "notes": "Phone photo at ~45 deg elevation; bubble wrap/box and coiled USB cable removed; Savant Elite2 control module and short pedal-to-module leads preserved; not stretched to the 10.75x7 in base. ACCEPTED as-is by user 2026-09-02 (all pedals visible and balanced). Left pedal touches the source frame edge (possible 1-2 px clip).",
+      "view": "front-elevated",
+      "image_added": "2026-09-02"
     },
     {
       "id": "pcsensor-family",
-      "image": null,
+      "image": "pcsensor_fs1-p.png",
       "brand": "PCsensor (RDing) - sold as IKKEGOL and many Amazon labels",
-      "models": ["FS1-P", "FS3-P", "FS2007", "FS2016", "FS2016 dual", "FS220", "FS221", "FS23", "FS2020", "FS2019 metal"],
-      "pedal_count": "1-3 depending on model",
+      "models": [
+        "FS1-P",
+        "FSP_1"
+      ],
+      "pedal_count": 1,
       "vid": "0C45",
       "pid": "7403 or 7404",
       "id_confidence": "CONFIRMED for classic generation (usb.ids: 0C45:7403 'Foot Switch', 0C45:7404 'Foot switch FS1-P'); newer models may differ",
-      "notes": "IMAGE WANTED - the most common cheap USB pedals in thrift circulation; all vendor photos are 3/4. Show generic placeholder until photographed. Planned filenames: pcsensor_fs1-p.png, pcsensor_fs3-p.png."
+      "notes": "Single-pedal FS1-P style unit (grey housing, yellow footprint pedal, metal button) as sold under IKKEGOL/PCsensor labels; USB cable and plug removed, keystone corrected, no aspect change. Source was only ~550 px wide, so the asset is upscaled and soft - replace with a sharper exact-model shot when possible. Other PCsensor molds now have separate registry entries so their artwork is not conflated with this shell.",
+      "view": "top-down (mild keystone corrected)",
+      "image_added": "2026-09-02"
+    },
+    {
+      "id": "pcsensor-fs23",
+      "image": "pcsensor_fs23.png",
+      "brand": "PCsensor (RDing)",
+      "models": [
+        "FS23"
+      ],
+      "pedal_count": 3,
+      "vid": null,
+      "pid": null,
+      "id_confidence": "model confirmed from official PCsensor catalog; USB VID/PID unverified - match product string when available and log at runtime",
+      "notes": "Black curved three-pedal FS23 shell. Official product photo cleaned locally; background, coiled USB cord and plug removed. A minimal cable-entry boundary is retained so no housing geometry is invented.",
+      "view": "3/4",
+      "image_added": "2026-09-02"
+    },
+    {
+      "id": "pcsensor-fs220",
+      "image": "pcsensor_fs220.png",
+      "brand": "PCsensor (RDing)",
+      "models": [
+        "FS220"
+      ],
+      "pedal_count": 1,
+      "vid": null,
+      "pid": null,
+      "id_confidence": "model confirmed from official PCsensor catalog; USB VID/PID unverified - match product string when available and log at runtime",
+      "notes": "Black single-pedal tread shell. Official product photo cleaned locally; background and external USB lead/plug removed. Do not automatically map FS221 to this image until its shell is visually confirmed.",
+      "view": "3/4",
+      "image_added": "2026-09-02"
+    },
+    {
+      "id": "pcsensor-fs2016-single",
+      "image": "pcsensor_fs2016-single.png",
+      "brand": "PCsensor (RDing) / iKKEGOL",
+      "models": [
+        "FS2016_USB",
+        "FS2016"
+      ],
+      "pedal_count": 1,
+      "vid": null,
+      "pid": null,
+      "id_confidence": "model family confirmed by PCsensor/iKKEGOL documentation; exact USB VID/PID unverified - match product string when available and log at runtime",
+      "notes": "Grey housing with yellow footprint tread, without the FS1-P metal button. Official PCsensor product photo cleaned locally; background and external USB lead/plug removed.",
+      "view": "3/4",
+      "image_added": "2026-09-02"
+    },
+    {
+      "id": "pcsensor-fs2016-usb2",
+      "image": "pcsensor_fs2016-usb2.png",
+      "brand": "PCsensor (RDing) / iKKEGOL",
+      "models": [
+        "FS2016_USB2",
+        "FS2016-USB2"
+      ],
+      "pedal_count": 2,
+      "vid": null,
+      "pid": null,
+      "id_confidence": "model label visible in source and confirmed by PCsensor/iKKEGOL documentation; USB VID/PID unverified - match product string when available and log at runtime",
+      "notes": "Dual grey-and-yellow FS2016 shell with the FS2016_USB2 model label preserved. High-resolution product photo cleaned locally; background, coiled USB cord and plug removed.",
+      "view": "front-elevated",
+      "image_added": "2026-09-02"
     },
     {
       "id": "cleware-f4",
-      "image": null,
+      "image": "cleware_f4.png",
       "brand": "Cleware GmbH",
-      "models": ["F4 foot switch"],
+      "models": [
+        "F4 foot switch"
+      ],
       "pedal_count": 1,
       "vid": "0D50",
       "pid": "0040",
       "id_confidence": "CONFIRMED (usb.ids)",
-      "notes": "IMAGE WANTED. Industrial single switch."
+      "notes": "Industrial single switch, true top-down vendor shot; USB cable removed above the cable gland (gland nut kept as hardware).",
+      "view": "top-down",
+      "image_added": "2026-09-02"
     },
     {
       "id": "xkeys-switch-interface",
-      "image": null,
+      "image": "xkeys_commercial-foot-switch.png",
       "brand": "X-keys (P.I. Engineering)",
-      "models": ["USB Switch Interface (used with 3.5mm Commercial Foot Switch, colors black/red/green/yellow)"],
+      "models": [
+        "USB Switch Interface (used with 3.5mm Commercial Foot Switch, colors black/red/green/yellow)"
+      ],
       "pedal_count": "1-3 passive switches via jacks",
       "vid": "05F3",
       "pid": "0232 / 0261 / 0264",
       "id_confidence": "CONFIRMED (usb.ids: X-Keys Switch Interface - Programming/SPLAT/Composite modes)",
-      "notes": "The USB device is the interface box; the pedal is a passive 3.5mm switch. Counted as USB kit per user scope decision. IMAGE WANTED (top-down of the commercial foot switch)."
+      "notes": "The USB device is the interface box; the pedal is a passive 3.5mm switch. Counted as USB kit per user scope decision. Image is a 3/4 view - ACCEPTED as-is by user 2026-09-02 (single-button pedal, nothing to disambiguate top-down); cable removed at the body exit.",
+      "view": "3/4",
+      "image_added": "2026-09-02"
     }
   ],
   "unknown_device_policy": {
     "display": "generic pedal silhouette placeholder with 'Unknown pedal' + VID:PID shown",
     "log": "Append VID, PID, manufacturer string, product string, timestamp to a local file (e.g. unknown_pedals.log) so future registry updates can map them - the user's thrift finds will crowdsource IDs that public databases lack.",
     "user_override": "Always let the user manually assign any registry image to any detected device, and persist that mapping."
-  }
+  },
+  "updated": "2026-09-02"
 }

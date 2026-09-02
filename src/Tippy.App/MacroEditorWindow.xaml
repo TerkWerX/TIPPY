@@ -355,6 +355,7 @@
                             <TabItem.Header><TextBlock Text="Programs &amp; signals" Foreground="{DynamicResource TextBrush}"/></TabItem.Header>
                             <WrapPanel Margin="10">
                                 <Button Content="Launch program" Click="AddProgram_Click" Margin="0,0,8,0"/>
+                                <Button Content="PowerShell command" Click="AddPowerShell_Click" Margin="0,0,8,0"/>
                                 <Button Content="Send MIDI" Click="AddMidi_Click" Margin="0,0,8,0"/>
                                 <Button Content="Send OSC" Click="AddOsc_Click"/>
                             </WrapPanel>

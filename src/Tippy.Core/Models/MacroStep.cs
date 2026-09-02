@@ -12,6 +12,7 @@ public enum MacroStepType
     GamepadButton,
     GamepadAxis,
     LaunchProgram,
+    PowerShellCommand,
     MouseMove,
     Midi,
     Osc
@@ -52,6 +53,7 @@ public sealed class MacroStep
         MacroStepType.GamepadButton => $"Gamepad {Value ?? "A"}",
         MacroStepType.GamepadAxis => $"Gamepad {Value ?? "Left X"} {(Amount >= 0 ? "+" : string.Empty)}{Amount}%",
         MacroStepType.LaunchProgram => $"Run {Path.GetFileName(Value) ?? "program"}",
+        MacroStepType.PowerShellCommand => $"PowerShell: {Trim(Value, 28)}",
         MacroStepType.MouseMove => $"Mouse {Value ?? "move"} at {Math.Abs(Amount)} px/tick",
         MacroStepType.Midi => $"MIDI {Value ?? "message"}",
         MacroStepType.Osc => $"OSC {Value ?? "/tippy"}",

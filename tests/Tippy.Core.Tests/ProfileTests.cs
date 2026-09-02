@@ -278,6 +278,12 @@ public sealed class ProfileTests
             Arguments = "--quiet",
             WorkingDirectory = @"C:\Tools"
         });
+        dual.Macro.Steps.Add(new MacroStep
+        {
+            Type = MacroStepType.PowerShellCommand,
+            Value = "Get-Service Spooler | Restart-Service",
+            Arguments = "Windows PowerShell 5.1 (built in)"
+        });
         dual.ReleaseMacro.Name = "Confirm";
         dual.ReleaseMacro.Steps.Add(new MacroStep { Type = MacroStepType.KeyChord, Keys = ["Enter"] });
         var shift = device.Banks[0].Bindings[1];
@@ -287,11 +293,16 @@ public sealed class ProfileTests
 
         var loaded = new ProfileSerializer().Deserialize(new ProfileSerializer().Serialize(profile));
         var loadedDual = loaded.Devices[0].Banks[0].Bindings[0];
-        var loadedProgram = Assert.Single(loadedDual.Macro.Steps);
+        Assert.Equal(2, loadedDual.Macro.Steps.Count);
+        var loadedProgram = loadedDual.Macro.Steps[0];
+        var loadedPowerShell = loadedDual.Macro.Steps[1];
 
         Assert.Equal(MacroStepType.LaunchProgram, loadedProgram.Type);
         Assert.Equal("--quiet", loadedProgram.Arguments);
         Assert.Equal(@"C:\Tools", loadedProgram.WorkingDirectory);
+        Assert.Equal(MacroStepType.PowerShellCommand, loadedPowerShell.Type);
+        Assert.Equal("Get-Service Spooler | Restart-Service", loadedPowerShell.Value);
+        Assert.Equal("Windows PowerShell 5.1 (built in)", loadedPowerShell.Arguments);
         Assert.Equal(["Enter"], Assert.Single(loadedDual.ReleaseMacro.Steps).Keys);
         Assert.Equal(MacroTriggerMode.ReleaseOnce, loadedDual.ReleaseMacro.TriggerMode);
         Assert.Equal(PedalBindingType.ShiftLayer, loaded.Devices[0].Banks[0].Bindings[1].Type);

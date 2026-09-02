@@ -8,12 +8,20 @@ public enum CrashRecoveryChoice { StartNormally, RestoreLatestBackup }
 
 public partial class CrashRecoveryWindow : Window
 {
-    private readonly string _logsDirectory;
+    private readonly PreviousCrashSession _previous;
+    private readonly CrashRecoveryService _crashRecovery;
+    private readonly SupportReportService _supportReports;
 
-    public CrashRecoveryWindow(PreviousCrashSession previous, string? latestBackup, string logsDirectory)
+    public CrashRecoveryWindow(
+        PreviousCrashSession previous,
+        string? latestBackup,
+        CrashRecoveryService crashRecovery,
+        SupportReportService supportReports)
     {
         InitializeComponent();
-        _logsDirectory = logsDirectory;
+        _previous = previous;
+        _crashRecovery = crashRecovery;
+        _supportReports = supportReports;
         LatestBackup = latestBackup;
         PreviousSessionText.Text = previous.StartedAt == DateTimeOffset.MinValue
             ? previous.Version
@@ -41,7 +49,21 @@ public partial class CrashRecoveryWindow : Window
 
     private void OpenLogs_Click(object sender, RoutedEventArgs e) => Process.Start(new ProcessStartInfo
     {
-        FileName = _logsDirectory,
+        FileName = _crashRecovery.LogsDirectory,
         UseShellExecute = true
     });
+
+    private void PrepareReport_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            var report = _supportReports.CreateCrashReport(_previous, _crashRecovery.CrashLogPath);
+            new SupportReportWindow(report) { Owner = this }.ShowDialog();
+        }
+        catch (Exception exception)
+        {
+            MessageBox.Show(this, $"Tippy could not prepare the report.\n\n{exception.Message}",
+                "Tippy support report", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+    }
 }

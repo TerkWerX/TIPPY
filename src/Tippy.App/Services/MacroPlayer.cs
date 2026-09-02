@@ -291,6 +291,10 @@ public sealed class MacroPlayer : IDisposable
                         ExecuteInjection(token, () => LaunchProgram(step));
                         RaiseOutput(triggerId, "program");
                         break;
+                    case MacroStepType.PowerShellCommand:
+                        ExecuteInjection(token, () => PowerShellCommandService.Launch(step));
+                        RaiseOutput(triggerId, "PowerShell");
+                        break;
                     case MacroStepType.Midi:
                         ExecuteInjection(token, () => _midi.Send(step.Value ?? string.Empty));
                         RaiseOutput(triggerId, "MIDI");

@@ -18,6 +18,20 @@ artifacts/
 .codex-temp/
 *.log
 Claude/rejected_angled/
+Claude/pedals/*.jpg
+Claude/pedals/*.jpeg
+Claude/pedals/*.avif
+Claude/pedals/Olympus RS28H-USB-Foot-Pedal.png
+Claude/pedals/*-clean.png
+Claude/pedals/HANDOFF.md
+Claude/pedals/CODEX_PROMPT.md
+Claude/pedals/pipeline/
+Claude/pedals/review/
+Claude/pedals/sources/
+
+# Local website workspace and scratch output are deployed separately
+WEBSITE/
+tmp/
 
 # OS metadata
 Thumbs.db

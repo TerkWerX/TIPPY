@@ -38,6 +38,7 @@ public partial class MainWindow : Window
     private readonly PedalPatternEngine _patternEngine = new();
     private readonly PedalActivityHub _pedalActivity = new();
     private readonly PedalRegistryService _pedalRegistry = new();
+    private readonly SupportReportService _supportReports;
     private readonly WindowPlacementService _windowPlacement = new();
     private readonly Dictionary<string, PedalDeviceInfo> _connected = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<(string DeviceKey, int SwitchIndex), Border> _switchTiles = new();
@@ -45,6 +46,8 @@ public partial class MainWindow : Window
     private readonly List<(FrameworkElement Visual, double MinimumHeight)> _sizablePedalVisuals = [];
     private readonly HashSet<(string DeviceKey, int SwitchIndex)> _pressedSwitches = [];
     private readonly HashSet<string> _artworkPickerQueued = new(StringComparer.OrdinalIgnoreCase);
+    private readonly HashSet<string> _unknownReportPrompted = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, Queue<string>> _recentRawReports = new(StringComparer.OrdinalIgnoreCase);
     private readonly Queue<(PedalDeviceProfile Profile, PedalDeviceInfo Info)> _pendingArtworkPickers = new();
     private readonly List<Button> _bankButtons = [];
     private readonly object _inputStateGate = new();
@@ -68,6 +71,7 @@ public partial class MainWindow : Window
     private HardwarePassportWindow? _passportWindow;
     private HardwareTestStationWindow? _hardwareStationWindow;
     private AdvancedFeaturesWindow? _advancedFeaturesWindow;
+    private TippyDoctorWindow? _doctorWindow;
     private StatusOverlayWindow? _overlayWindow;
     private bool _rehearsalMode;
     private string? _startupProfileError;
@@ -80,6 +84,7 @@ public partial class MainWindow : Window
     public MainWindow(bool forceStartMinimized = false)
     {
         InitializeComponent();
+        _supportReports = new SupportReportService(_profileStore.AppDataDirectory);
         _forceStartMinimized = forceStartMinimized;
         try
         {
@@ -162,9 +167,12 @@ public partial class MainWindow : Window
             if (e.IsConnected)
             {
                 _pedalRegistry.Reload();
+                var registryMatch = _pedalRegistry.Match(e.Device.VendorId, e.Device.ProductId,
+                    e.Device.Manufacturer, e.Device.DisplayName);
                 _connected[e.Device.DeviceKey] = e.Device;
                 var deviceProfile = _profile.Devices.FirstOrDefault(device =>
                     device.DeviceKey.Equals(e.Device.DeviceKey, StringComparison.OrdinalIgnoreCase));
+                var isNewDevice = deviceProfile is null;
                 if (deviceProfile is null)
                 {
                     deviceProfile = PedalDeviceProfile.Create(e.Device.DeviceKey, e.Device.DisplayName,
@@ -198,6 +206,10 @@ public partial class MainWindow : Window
                 if (needsAmbiguousChoice && _artworkPickerQueued.Add(deviceProfile.DeviceKey))
                 {
                     QueueArtworkPicker(deviceProfile, e.Device);
+                }
+                if (isNewDevice && registryMatch is null && _unknownReportPrompted.Add(e.Device.DeviceKey))
+                {
+                    Dispatcher.BeginInvoke(new Action(() => PromptUnknownPedalReport(e.Device)));
                 }
             }
             else
@@ -233,6 +245,7 @@ public partial class MainWindow : Window
     {
         Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Send, new Action(() =>
         {
+            RememberRawReport(e);
             if (_inputSuspended) return;
             _diagnosticsWindow?.Record(e, System.Diagnostics.Stopwatch.GetTimestamp());
             _passportWindow?.Record(e, System.Diagnostics.Stopwatch.GetTimestamp());
@@ -1475,8 +1488,12 @@ public partial class MainWindow : Window
     }
 
     private void ApplicationProfiles_Click(object sender, RoutedEventArgs e)
+        => OpenApplicationProfiles();
+
+    private void OpenApplicationProfiles(bool discoverCompatibleApps = false)
     {
-        var editor = new ApplicationProfilesWindow(_profile.ApplicationProfiles, _profile.Devices)
+        var editor = new ApplicationProfilesWindow(_profile.ApplicationProfiles, _profile.Devices,
+            discoverCompatibleApps)
         {
             Owner = this
         };
@@ -1490,10 +1507,15 @@ public partial class MainWindow : Window
         SetStatus($"Saved {_profile.ApplicationProfiles.Count} application scene{(_profile.ApplicationProfiles.Count == 1 ? string.Empty : "s")}");
     }
 
+    private void OpenCompatibleApplications() => OpenApplicationProfiles(true);
+
     private void Tools_Click(object sender, RoutedEventArgs e)
     {
         var menu = new ContextMenu();
         menu.Items.Add(CreateToolsItem("Advanced Features center", OpenAdvancedFeatures));
+        menu.Items.Add(CreateToolsItem("Tippy Doctor", OpenTippyDoctor));
+        menu.Items.Add(CreateToolsItem("Create privacy-safe support report", OpenSupportReportCenter));
+        menu.Items.Add(CreateToolsItem("Find compatible applications", OpenCompatibleApplications));
         menu.Items.Add(new Separator());
         menu.Items.Add(CreateToolsItem("Foot combinations & sequences", OpenFootPatterns));
         menu.Items.Add(CreateToolsItem("Live pedal diagnostics", OpenDiagnostics));
@@ -1526,8 +1548,10 @@ public partial class MainWindow : Window
         }
         var features = new AdvancedFeatureItem[]
         {
+            new("SAFETY", "Tippy Doctor", "Run one privacy-safe readiness check for storage, connected pedals, hotkeys, outputs, scenes, and recovery.", OpenTippyDoctor),
+            new("SAFETY", "Support and crash reports", "Review a redacted local report, then deliberately open a prefilled GitHub issue without sharing profiles, macros, typed text, or raw device paths.", OpenSupportReportCenter),
             new("AUTOMATION", "Application scenes", "Give each application or matching window title its own complete three-bank setup for every pedal.",
-                () => ApplicationProfiles_Click(this, new RoutedEventArgs())),
+                () => OpenApplicationProfiles()),
             new("AUTOMATION", "Foot combinations & sequences", "Trigger an action from multiple pedals together or from an ordered series of presses.", OpenFootPatterns),
             new("AUTOMATION", "Rehearsal mode", "Exercise banks, gestures, scenes, and patterns while suppressing every output action.", () => SetRehearsalMode(!_rehearsalMode)),
             new("DEVICES", "Hardware Passport", "Certify switch repetition, simultaneous presses, releases, reconnect behavior, and routing latency.", OpenHardwarePassport),
@@ -1545,11 +1569,130 @@ public partial class MainWindow : Window
                 () => Settings_Click(this, new RoutedEventArgs())),
             new("AUTOMATION", "Named variable manager", "Create, preview, and reuse friendly named values without editing raw name=value lines.", OpenVariableManager),
             new("SOFTWARE", "Check for updates", "Ask GitHub for the latest public Tippy release; no account, telemetry, or background service is used.",
-                () => _ = CheckForUpdatesAsync(true))
+                () => _ = CheckForUpdatesAsync(true)),
+            new("SOFTWARE", "Find compatible applications", "With permission, scan local installed-program entries, Start Menu shortcuts, and visible apps, then review matches before creating scenes.",
+                OpenCompatibleApplications)
         };
         _advancedFeaturesWindow = new AdvancedFeaturesWindow(features) { Owner = this };
         _advancedFeaturesWindow.Closed += (_, _) => _advancedFeaturesWindow = null;
         _advancedFeaturesWindow.Show();
+    }
+
+    private void OpenTippyDoctor()
+    {
+        if (_doctorWindow is { IsLoaded: true })
+        {
+            _doctorWindow.Activate();
+            return;
+        }
+
+        TippyDoctorReport RunChecks()
+        {
+            var context = new TippyDoctorContext
+            {
+                ProfileStore = _profileStore,
+                Profile = _profile,
+                PedalRegistry = _pedalRegistry,
+                ConnectedDevices = _connected.Values.ToArray(),
+                HidListening = _loaded,
+                BankHotkeyRegistered = _hotkey.IsRegistered,
+                EmergencyHotkeyRegistered = _emergencyHotkey.IsRegistered,
+                StartupProfileError = _startupProfileError,
+                StartupRegistrationProbe = () => new StartupRegistrationService().IsEnabled(),
+                GamepadProbe = () => (_gamepad.TryInitialize(), _gamepad.Status)
+            };
+            return new TippyDoctorService().Run(context);
+        }
+
+        _doctorWindow = new TippyDoctorWindow(RunChecks, ReleaseAllInputs, OpenCompatibleApplications)
+        {
+            Owner = this
+        };
+        _doctorWindow.Closed += (_, _) => _doctorWindow = null;
+        _doctorWindow.Show();
+    }
+
+    private async void PromptUnknownPedalReport(PedalDeviceInfo device)
+    {
+        var answer = MessageBox.Show(this,
+            $"Tippy does not have a confident library match for:\n\n{device.DisplayName}\n{device.VidPid}\n\n" +
+            "Would you like to prepare a privacy-safe hardware report for TerkWerX? " +
+            "Nothing is sent automatically, and you can review every line before opening GitHub. " +
+            "You can also do this later from Tools after pressing each switch a few times.",
+            "Unknown foot control", MessageBoxButton.YesNo, MessageBoxImage.Question);
+        if (answer != MessageBoxResult.Yes)
+        {
+            SetStatus($"Unknown pedal detected · report it later from Tools · {device.DisplayName}");
+            return;
+        }
+        await ShowUnknownPedalReportAsync(device);
+    }
+
+    private async void OpenSupportReportCenter()
+    {
+        try
+        {
+            var unknown = _connected.Values.FirstOrDefault(device =>
+                _pedalRegistry.Match(device.VendorId, device.ProductId, device.Manufacturer, device.DisplayName) is null);
+            if (unknown is not null)
+            {
+                await ShowUnknownPedalReportAsync(unknown);
+                return;
+            }
+
+            var samples = _recentRawReports.ToDictionary(
+                item => item.Key,
+                item => (IReadOnlyCollection<string>)item.Value.ToArray(),
+                StringComparer.OrdinalIgnoreCase);
+            var report = _supportReports.CreateDiagnosticsReport(_connected.Values, samples);
+            new SupportReportWindow(report) { Owner = this }.ShowDialog();
+        }
+        catch (Exception exception)
+        {
+            MessageBox.Show(this, $"Tippy could not prepare the support report.\n\n{exception.Message}",
+                "Tippy support report", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+    }
+
+    private async Task ShowUnknownPedalReportAsync(PedalDeviceInfo device)
+    {
+        try
+        {
+            SetStatus($"Reading privacy-safe USB details for {device.DisplayName}…");
+            var candidate = await Task.Run(() =>
+            {
+                var candidates = new HidLearningService().ListCandidates();
+                return candidates.FirstOrDefault(item =>
+                           item.DevicePath.Equals(device.DevicePath, StringComparison.OrdinalIgnoreCase))
+                       ?? candidates.FirstOrDefault(item => item.VendorId == device.VendorId &&
+                           item.ProductId == device.ProductId &&
+                           item.ProductName.Equals(device.DisplayName, StringComparison.OrdinalIgnoreCase));
+            });
+            var samples = _recentRawReports.TryGetValue(device.DeviceKey, out var reports)
+                ? reports.ToArray()
+                : [];
+            var report = _supportReports.CreateUnknownPedalReport(device, candidate, samples);
+            SetStatus($"Support report prepared locally · {System.IO.Path.GetFileName(report.FilePath)}");
+            new SupportReportWindow(report) { Owner = this }.ShowDialog();
+        }
+        catch (Exception exception)
+        {
+            MessageBox.Show(this, $"Tippy could not prepare the pedal report.\n\n{exception.Message}",
+                "Tippy support report", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+    }
+
+    private void RememberRawReport(PedalStateEventArgs input)
+    {
+        var raw = Convert.ToHexString(input.RawReport);
+        if (!_recentRawReports.TryGetValue(input.Device.DeviceKey, out var samples))
+        {
+            samples = new Queue<string>();
+            _recentRawReports[input.Device.DeviceKey] = samples;
+        }
+        if (samples.Contains(raw, StringComparer.Ordinal)) return;
+        samples.Enqueue(raw);
+        while (samples.Count > 20) samples.Dequeue();
     }
 
     private static MenuItem CreateToolsItem(string header, Action action)

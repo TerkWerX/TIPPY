@@ -10,21 +10,29 @@ public partial class ApplicationProfilesWindow : Window
     private readonly List<ApplicationProfileRule> _working;
     private readonly IReadOnlyList<PedalDeviceProfile> _devices;
     private readonly Dictionary<string, ComboBox> _bankBoxes = new(StringComparer.OrdinalIgnoreCase);
+    private readonly bool _openDiscoveryOnLoad;
     private int _editingIndex = -1;
     private bool _loading;
 
     public ApplicationProfilesWindow(
         IEnumerable<ApplicationProfileRule> profiles,
-        IReadOnlyList<PedalDeviceProfile> devices)
+        IReadOnlyList<PedalDeviceProfile> devices,
+        bool openDiscoveryOnLoad = false)
     {
         InitializeComponent();
         _working = profiles.Select(profile => profile.Clone()).ToList();
         _devices = devices;
+        _openDiscoveryOnLoad = openDiscoveryOnLoad;
         foreach (var profile in _working)
             foreach (var device in _devices)
                 profile.EnsureDeviceScene(device);
         Result = _working.Select(profile => profile.Clone()).ToList();
-        Loaded += (_, _) => RefreshList(_working.Count > 0 ? 0 : -1);
+        Loaded += (_, _) =>
+        {
+            RefreshList(_working.Count > 0 ? 0 : -1);
+            if (_openDiscoveryOnLoad)
+                Dispatcher.BeginInvoke(new Action(OpenCompatibleApplicationDiscovery));
+        };
     }
 
     public IReadOnlyList<ApplicationProfileRule> Result { get; private set; }
@@ -140,20 +148,8 @@ public partial class ApplicationProfilesWindow : Window
             Filter = "Windows applications (*.exe)|*.exe|All files (*.*)|*.*"
         };
         if (dialog.ShowDialog(this) != true) return;
-        var profile = new ApplicationProfileRule
-        {
-            Name = Path.GetFileNameWithoutExtension(dialog.FileName),
-            ProcessName = Path.GetFileNameWithoutExtension(dialog.FileName),
-            ExecutablePath = dialog.FileName,
-            DeviceBanks = _devices.Select(device => new ApplicationDeviceBank
-            {
-                DeviceKey = device.DeviceKey,
-                BankIndex = device.ActiveBankIndex
-            }).ToList(),
-            DeviceScenes = _devices.Select(CreateScene).ToList()
-        };
-        profile.Normalize();
-        _working.Add(profile);
+        _working.Add(CreateProfile(Path.GetFileNameWithoutExtension(dialog.FileName),
+            Path.GetFileNameWithoutExtension(dialog.FileName), dialog.FileName));
         RefreshList(_working.Count - 1);
     }
 
@@ -185,20 +181,35 @@ public partial class ApplicationProfilesWindow : Window
             applications.Select(item => item.Label).ToArray());
         var selected = applications.FirstOrDefault(item => item.Label == choice);
         if (string.IsNullOrWhiteSpace(selected.Name)) return;
-        var profile = new ApplicationProfileRule
+        _working.Add(CreateProfile(selected.Name, selected.Name, selected.Path));
+        RefreshList(_working.Count - 1);
+    }
+
+    private void FindCompatibleApps_Click(object sender, RoutedEventArgs e) => OpenCompatibleApplicationDiscovery();
+
+    private void OpenCompatibleApplicationDiscovery()
+    {
+        SaveCurrentEditor();
+        var permission = MessageBox.Show(this,
+            "Tippy can scan this PC for applications in its keyboard-shortcut catalog.\n\n" +
+            "The scan reads installed-program names, Start Menu shortcuts, and visible running apps. " +
+            "It does not inspect documents, browser history, application data, or send an inventory anywhere.\n\n" +
+            "Scan now?",
+            "Find compatible applications", MessageBoxButton.YesNo, MessageBoxImage.Information);
+        if (permission != MessageBoxResult.Yes) return;
+
+        var discovery = new CompatibleApplicationsWindow(_working) { Owner = this };
+        if (discovery.ShowDialog() != true) return;
+        foreach (var match in discovery.Result)
         {
-            Name = selected.Name,
-            ProcessName = selected.Name,
-            ExecutablePath = selected.Path,
-            DeviceBanks = _devices.Select(device => new ApplicationDeviceBank
-            {
-                DeviceKey = device.DeviceKey,
-                BankIndex = device.ActiveBankIndex
-            }).ToList(),
-            DeviceScenes = _devices.Select(CreateScene).ToList()
-        };
-        profile.Normalize();
-        _working.Add(profile);
+            if (_working.Any(profile =>
+                    (!string.IsNullOrWhiteSpace(match.ProcessName) &&
+                     profile.ProcessName.Equals(match.ProcessName, StringComparison.OrdinalIgnoreCase)) ||
+                    (!string.IsNullOrWhiteSpace(match.ExecutablePath) &&
+                     profile.ExecutablePath.Equals(match.ExecutablePath, StringComparison.OrdinalIgnoreCase))))
+                continue;
+            _working.Add(CreateProfile(match.CatalogProfile.Name, match.ProcessName, match.ExecutablePath));
+        }
         RefreshList(_working.Count - 1);
     }
 
@@ -248,6 +259,24 @@ public partial class ApplicationProfilesWindow : Window
         ActiveBankIndex = device.ActiveBankIndex,
         Banks = device.Banks.Select(bank => bank.Clone()).ToList()
     };
+
+    private ApplicationProfileRule CreateProfile(string name, string processName, string executablePath)
+    {
+        var profile = new ApplicationProfileRule
+        {
+            Name = name,
+            ProcessName = processName,
+            ExecutablePath = executablePath,
+            DeviceBanks = _devices.Select(device => new ApplicationDeviceBank
+            {
+                DeviceKey = device.DeviceKey,
+                BankIndex = device.ActiveBankIndex
+            }).ToList(),
+            DeviceScenes = _devices.Select(CreateScene).ToList()
+        };
+        profile.Normalize();
+        return profile;
+    }
 
     private void Save_Click(object sender, RoutedEventArgs e)
     {

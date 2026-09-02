@@ -1,0 +1,54 @@
+<Window x:Class="Tippy.App.SupportReportWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Tippy support report" Width="820" Height="650" MinWidth="680" MinHeight="520"
+        WindowStartupLocation="CenterOwner" ShowInTaskbar="False"
+        Background="{DynamicResource BackgroundBrush}" Foreground="{DynamicResource TextBrush}"
+        Icon="/Tippy;component/Assets/Icons/tippy.ico">
+    <Grid Margin="24">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <StackPanel>
+            <TextBlock Text="Review your Tippy support report" FontSize="24" FontWeight="SemiBold"/>
+            <TextBlock x:Name="KindText" Margin="0,6,0,0" Style="{StaticResource SmallMutedText}" TextWrapping="Wrap"/>
+        </StackPanel>
+
+        <Border Grid.Row="1" Margin="0,16,0,12" Padding="14" CornerRadius="9"
+                Background="{DynamicResource AccentSoftBrush}" BorderBrush="{DynamicResource AccentBrush}" BorderThickness="1">
+            <TextBlock TextWrapping="Wrap">
+                <Run FontWeight="SemiBold" Text="Nothing has been uploaded. "/>
+                <Run Text="Tippy saved this report locally. Review it below; only Open GitHub issue launches your browser, and you must attach the JSON file yourself. No GitHub or OpenAI key is used."/>
+            </TextBlock>
+        </Border>
+
+        <Grid Grid.Row="2" Margin="0,0,0,10">
+            <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+            <TextBlock Text="Local file" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,12,0"/>
+            <TextBox x:Name="ReportPathText" Grid.Column="1" IsReadOnly="True" TextWrapping="NoWrap"/>
+        </Grid>
+
+        <TextBox x:Name="PreviewText" Grid.Row="3" IsReadOnly="True" AcceptsReturn="True"
+                 FontFamily="Cascadia Mono, Consolas" FontSize="12" TextWrapping="NoWrap"
+                 VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto"/>
+
+        <Grid Grid.Row="4" Margin="0,14,0,0">
+            <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+            <WrapPanel>
+                <Button Content="Save a copy" Click="SaveCopy_Click" Margin="0,0,8,8"/>
+                <Button Content="Open report folder" Click="OpenFolder_Click" Margin="0,0,8,8"/>
+                <Button Content="Copy issue text" Click="CopyIssue_Click" Margin="0,0,8,8"/>
+            </WrapPanel>
+            <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right">
+                <Button Content="Close" Click="Close_Click" Margin="0,0,8,8"/>
+                <Button Content="Open GitHub issue" Click="OpenGitHub_Click" Margin="0,0,0,8"
+                        Background="{DynamicResource AccentBrush}" Foreground="#101820"/>
+            </StackPanel>
+        </Grid>
+    </Grid>
+</Window>

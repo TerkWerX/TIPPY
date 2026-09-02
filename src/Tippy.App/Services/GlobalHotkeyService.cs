@@ -19,6 +19,8 @@ public sealed class GlobalHotkeyService : IDisposable
     private IntPtr _handle;
     private Action? _callback;
 
+    public bool IsRegistered => _handle != IntPtr.Zero && _callback is not null;
+
     public bool Register(Window owner, string shortcut, Action callback, out string? error)
     {
         Unregister();

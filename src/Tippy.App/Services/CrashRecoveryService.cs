@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using System.Text.Json;
 
 namespace Tippy.App.Services;
@@ -7,6 +6,7 @@ public sealed class CrashRecoveryService
 {
     private readonly string _markerPath;
     private readonly object _logGate = new();
+    private bool _fatalCrashDetected;
 
     public CrashRecoveryService(string appDataDirectory)
     {
@@ -40,10 +40,11 @@ public sealed class CrashRecoveryService
         return previous;
     }
 
-    public void Log(Exception exception, string source)
+    public void Log(Exception exception, string source, bool fatal = false)
     {
         lock (_logGate)
         {
+            if (fatal) _fatalCrashDetected = true;
             try
             {
                 File.AppendAllText(CrashLogPath,
@@ -55,6 +56,7 @@ public sealed class CrashRecoveryService
 
     public void CompleteSession()
     {
+        if (_fatalCrashDetected) return;
         try { File.Delete(_markerPath); } catch { }
     }
 }

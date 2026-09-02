@@ -6,7 +6,7 @@ namespace Tippy.App;
 
 public partial class App : Application
 {
-    private const int SplashDurationMilliseconds = 5_000;
+    private const int SplashDurationMilliseconds = 10_000;
     private Mutex? _singleInstance;
     private CrashRecoveryService? _crashRecovery;
 
@@ -24,10 +24,10 @@ public partial class App : Application
         ShutdownMode = ShutdownMode.OnExplicitShutdown;
         var profileStore = new Services.ProfileStore();
         _crashRecovery = new CrashRecoveryService(profileStore.AppDataDirectory);
-        DispatcherUnhandledException += (_, args) => _crashRecovery.Log(args.Exception, "WPF dispatcher");
+        DispatcherUnhandledException += (_, args) => _crashRecovery.Log(args.Exception, "WPF dispatcher", true);
         AppDomain.CurrentDomain.UnhandledException += (_, args) =>
         {
-            if (args.ExceptionObject is Exception exception) _crashRecovery.Log(exception, "AppDomain");
+            if (args.ExceptionObject is Exception exception) _crashRecovery.Log(exception, "AppDomain", true);
         };
         TaskScheduler.UnobservedTaskException += (_, args) =>
         {
@@ -38,7 +38,8 @@ public partial class App : Application
         if (previousCrash is not null)
         {
             var latestBackup = profileStore.GetBackups().FirstOrDefault();
-            var recovery = new CrashRecoveryWindow(previousCrash, latestBackup, _crashRecovery.LogsDirectory);
+            var supportReports = new SupportReportService(profileStore.AppDataDirectory);
+            var recovery = new CrashRecoveryWindow(previousCrash, latestBackup, _crashRecovery, supportReports);
             if (recovery.ShowDialog() == true && recovery.Choice == CrashRecoveryChoice.RestoreLatestBackup &&
                 recovery.LatestBackup is not null)
             {

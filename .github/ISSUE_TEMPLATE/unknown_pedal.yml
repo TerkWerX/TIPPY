@@ -1,0 +1,44 @@
+name: Unknown pedal support
+description: Help Tippy recognize and support a USB foot control
+title: "[Unknown pedal]: "
+labels: [hardware]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for helping expand Tippy's hardware support. In Tippy, choose **Tools → Create privacy-safe support report**, review the JSON, and attach it below. Tippy never uploads it automatically.
+  - type: input
+    id: model
+    attributes:
+      label: Brand and model printed on the pedal
+      placeholder: Brand / model / version
+    validations:
+      required: true
+  - type: input
+    id: switches
+    attributes:
+      label: Number of physical switches
+      placeholder: "3"
+    validations:
+      required: true
+  - type: textarea
+    id: behavior
+    attributes:
+      label: What Tippy detects
+      description: Which switches work, do not work, appear swapped, or cannot be pressed simultaneously?
+    validations:
+      required: true
+  - type: textarea
+    id: report
+    attributes:
+      label: Tippy support report
+      description: Drag the reviewed tippy-unknown-pedal JSON file here. Never post a raw device path or serial number.
+    validations:
+      required: true
+  - type: checkboxes
+    id: privacy
+    attributes:
+      label: Privacy confirmation
+      options:
+        - label: I reviewed the report before attaching it.
+          required: true

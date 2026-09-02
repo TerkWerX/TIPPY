@@ -14,6 +14,26 @@ public static class PromptDialog
         return dialog.ShowDialog() == true ? box.Text : null;
     }
 
+    public static string? AskMultiline(Window owner, string title, string prompt, string initialValue)
+    {
+        var box = new TextBox
+        {
+            Text = initialValue,
+            MinWidth = 500,
+            MinHeight = 170,
+            Margin = new Thickness(0, 8, 0, 18),
+            AcceptsReturn = true,
+            AcceptsTab = true,
+            TextWrapping = TextWrapping.Wrap,
+            VerticalScrollBarVisibility = ScrollBarVisibility.Auto
+        };
+        var dialog = Create(owner, title, prompt, box, 580, ResizeMode.CanResize);
+        dialog.MinWidth = 580;
+        dialog.MinHeight = 330;
+        dialog.Loaded += (_, _) => { box.Focus(); box.CaretIndex = box.Text.Length; };
+        return dialog.ShowDialog() == true ? box.Text : null;
+    }
+
     public static string? Choose(Window owner, string title, string prompt, IReadOnlyList<string> choices)
     {
         var list = new ComboBox { ItemsSource = choices, SelectedIndex = 0, MinWidth = 330, Margin = new Thickness(0, 8, 0, 18) };
@@ -21,12 +41,13 @@ public static class PromptDialog
         return dialog.ShowDialog() == true ? list.SelectedItem?.ToString() : null;
     }
 
-    private static Window Create(Window owner, string title, string prompt, Control input)
+    private static Window Create(Window owner, string title, string prompt, Control input,
+        double width = 410, ResizeMode resizeMode = ResizeMode.NoResize)
     {
         var dialog = new Window
         {
-            Owner = owner, Title = title, Width = 410, SizeToContent = SizeToContent.Height,
-            WindowStartupLocation = WindowStartupLocation.CenterOwner, ResizeMode = ResizeMode.NoResize,
+            Owner = owner, Title = title, Width = width, SizeToContent = SizeToContent.Height,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner, ResizeMode = resizeMode,
             ShowInTaskbar = false, Background = (Brush)Application.Current.FindResource("BackgroundBrush")
         };
         var root = new StackPanel { Margin = new Thickness(22) };

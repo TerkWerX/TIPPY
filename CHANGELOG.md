@@ -4,8 +4,16 @@ Notable changes to Tippy are documented here.
 
 ## Unreleased
 
+## [0.7.0] - 2026-09-02
+
 ### Added
 
+- First-class multiline PowerShell command steps with Windows PowerShell 5.1 or PowerShell 7 selection, Tippy-variable expansion, press/release/gesture assignment support, and security-respecting execution that never elevates or bypasses Windows policy.
+- An optional, non-intrusive **Support Tippy with PayPal** link in the About window and project README; Tippy remains fully usable without donating and never displays donation prompts during normal use or installation.
+- A ten-second branded startup splash presentation, giving the Tippy artwork and project credit more time to remain visible before the main window opens.
+- Privacy-first support reporting for newly detected unknown pedals and unclean exits, with local JSON previews, bounded raw-HID samples, SHA-256 device-path fingerprints, crash-text redaction, and explicitly user-initiated prefilled GitHub issues. No credentials or automatic telemetry are used.
+- **Tippy Doctor**, a one-screen local readiness check for storage and backups, HID/pedals, hotkeys and safety limits, keyboard/mouse/gamepad/MIDI/OSC outputs, startup registration, and application scenes, with redacted JSON report export and an emergency held-input release command.
+- Permission-gated compatible-application discovery across Windows installed-program entries, Start Menu shortcuts, and visible running applications, with local catalog matching, review-before-add selection, duplicate protection, and complete current-bank scene creation.
 - Reusable named OSC endpoint presets, a live OSC packet test screen, preset-linked macro steps, and standards-tested integer/float/string packet encoding.
 - Full virtual Xbox analog output for both thumb sticks and triggers, with configurable intensity, one-shot neutral return, overlap-safe held ownership, and a combined digital/analog driver test.
 - A named-variable manager with add, duplicate, remove, token display, built-in values, and live macro-expansion previews.

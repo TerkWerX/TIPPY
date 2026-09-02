@@ -27,7 +27,9 @@
                 <WrapPanel Grid.Row="1" Margin="0,10,0,0">
                     <Button Content="Add executable" Click="AddProfile_Click" Margin="0,0,7,0" Background="{DynamicResource AccentSoftBrush}"/>
                     <Button Content="Add running app" Click="AddRunningProfile_Click" Margin="0,0,7,0"/>
-                    <Button Content="Remove" Click="RemoveProfile_Click"/>
+                    <Button Content="Find compatible apps" Click="FindCompatibleApps_Click" Margin="0,7,7,0"
+                            ToolTip="Privately scan installed-program entries, Start Menu shortcuts, and visible running applications"/>
+                    <Button Content="Remove" Click="RemoveProfile_Click" Margin="0,7,0,0"/>
                 </WrapPanel>
             </Grid>
 

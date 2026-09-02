@@ -602,6 +602,33 @@ public partial class MacroEditorWindow : Window
         RefreshSteps(CurrentMacro.Steps.Count - 1);
     }
 
+    private void AddPowerShell_Click(object sender, RoutedEventArgs e)
+    {
+        var confirmation = MessageBox.Show(this,
+            "PowerShell commands run under your current Windows account and can change files or system settings. " +
+            "Tippy does not request administrator rights, bypass execution policy, or weaken Windows security.\n\n" +
+            "Only add a command that you understand and trust. Continue?",
+            "Add PowerShell command", MessageBoxButton.YesNo, MessageBoxImage.Warning);
+        if (confirmation != MessageBoxResult.Yes) return;
+
+        var host = PromptDialog.Choose(this, "PowerShell host", "Choose the PowerShell host to run this command with",
+            [PowerShellCommandService.WindowsPowerShell, PowerShellCommandService.PowerShell7]);
+        if (host is null) return;
+
+        var command = PromptDialog.AskMultiline(this, "PowerShell command",
+            "Enter the command or script block. Tippy variables such as {date}, {device}, and custom values are supported.",
+            string.Empty);
+        if (string.IsNullOrWhiteSpace(command)) return;
+
+        CurrentMacro.Steps.Add(new MacroStep
+        {
+            Type = MacroStepType.PowerShellCommand,
+            Value = command.Trim(),
+            Arguments = host
+        });
+        RefreshSteps(CurrentMacro.Steps.Count - 1);
+    }
+
     private void EditReleaseAction_Click(object sender, RoutedEventArgs e)
     {
         _working.Macro.Name = string.IsNullOrWhiteSpace(NameBox.Text) ? "Unnamed macro" : NameBox.Text.Trim();
